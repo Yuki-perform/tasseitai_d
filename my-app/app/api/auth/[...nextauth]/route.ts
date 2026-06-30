@@ -35,7 +35,7 @@ export const authOptions = {
       },
 
       token: {
-        async request({ params }) {
+        async request({ params }: { params: { code?: string } }) {
           const response = await fetch("https://api.notion.com/v1/oauth/token", {
             method: "POST",
             headers: {
