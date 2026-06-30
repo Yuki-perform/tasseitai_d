@@ -1,271 +1,303 @@
+/* ==========================================================================
+   共通・ベースのスタイル（スマホファースト、または全体共通）
+   ========================================================================== */
+
+/* 全体のコンテナ */
 .container {
-  min-height: 100vh;
-  background-color: var(--background) !important; 
-  color: var(--foreground) !important;   
+  width: 100%;       /* 画面の横幅いっぱいに広げる */
+  margin: 0;         /* 中央寄せを解除 */
   padding: 16px;
+  background-color: #3b3a4e; /* モックアップの暗い背景色 */
+  min-height: 100vh;
+  color: #ffffff;
   font-family: sans-serif;
-  max-width: 530px; /* スマホサイズに固定 */
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-sizing: border-box;
+  position: relative;
 }
 
-/* ヘッダーエリア */
+/* 歯車ヘッダー */
 .header {
   display: flex;
   justify-content: flex-end;
-  align-items: center;
-  padding: 4px 4px;
+  padding-bottom: 8px;
 }
 
 .iconBtn {
   background: none;
   border: none;
   font-size: 24px;
-  color: var(--foreground);
   cursor: pointer;
+}
+
+/* 共通のカードデザイン（グレーの半透明・角丸） */
+.card {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+/* 📱 スマホ時のデフォルト：要素は全て縦1列に並べる */
+.mainGrid {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-}
-
-.gearIcon {
-  font-size: 1.5rem;
-}
-
-.title {
-  font-size: 1.25rem;
-  font-weight: bold;
-  margin: 0 0 4px 0;
-  padding: 0 4px;
-  color: var(--foreground);
-}
-
-/* ⭕ 【デザイン変更】サイズはそのまま、AIチャットだけをネオン風に主役化 */
-.aiChatFullCard {
-  /* 深い宇宙のような青紫グラデーション */
-  background: linear-gradient(135deg, #1e1b4b, #311042);
-  text-decoration: none;
-  border-radius: 16px;
-  padding: 20px; /* サイズ維持 */
-  /* 妖しく光るグロウ効果をプラス */
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4), 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  min-height: 80px; /* サイズ維持 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(129, 140, 248, 0.3); /* 光る極細の枠線 */
-}
-
-.aiChatFullCard:hover {
-  box-shadow: 0 0 25px rgba(139, 92, 246, 0.6);
-  border-color: rgba(167, 139, 250, 0.6);
-}
-
-.aiChatFullCard:active {
-  transform: scale(0.98); /* サイズ維持 */
-}
-
-.chatLinkContentRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.chatTextLarge {
-  font-size: 1.5rem; /* サイズ維持 */
-  font-weight: bold;
-  color: #ffffff;
-}
-
-.chatEmojiLarge {
-  font-size: 2rem; /* サイズ維持 */
-  animation: float 3s ease-in-out infinite; /* ロボットが浮遊する遊び心 */
-}
-
-/* ロボットの浮遊アニメーション */
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
-  100% { transform: translateY(0px); }
-}
-
-/* 上段：2カラムのグリッド（予定と天気用） */
-.topGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
 
-/* 共通のカード基盤（脇役として高級感のあるダークグレーに） */
-.card {
-  border-radius: 16px;
-  padding: 16px; /* サイズ維持 */
-  background: linear-gradient(135deg, #121212, #1a1a1a) !important; /* 少し引いた黒 */
-  color: #e2e8f0; /* 目に優しいオフホワイト */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+/* ⬇️ ここからスマホの表示順を指定（数字が小さい順に上から並びます） */
+.aiChatFullCard   { order: 1; } /* 1. Noir */
+.quickLinkCard    { order: 2; } /* 2. クイックリンク */
+.scheduleTodoGrid { order: 3; } /* 3 & 4. スケジュールとToDoの塊 */
+.weatherCard      { order: 5; } /* 5. 天気 */
+.newsCard         { order: 6; } /* 6. News */
+.githubFullCard   { order: 7; } /* 7. GitHub */
+
+/* スケジュールとToDoのエリア（スマホ時は縦並びにする） */
+.scheduleTodoGrid {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  min-height: 144px; /* サイズ維持 */
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.05); /* 上品な細い枠線 */
+  gap: 16px;
+}
+/* スケジュール(3) のあとに ToDo(4) が来るように指定 */
+.scheduleCard     { order: 1; }
+.todoCard         { order: 2; }
+
+/* 左カラム・右カラムのラッパー自体は、PCのグリッド構造のために残しますが、
+   スマホ時は邪魔をしないように display: contents; に設定します */
+.leftColumn, .rightColumn {
+  display: contents;
 }
 
-.scheduleCard {
-  /* 基盤側で一括管理するため指定なし */
+
+/* ==========================================================================
+   個別のコンポーネントデザイン
+   ========================================================================== */
+
+/* AIチャット（Noir） */
+.aiChatFullCard {
+  composes: card;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #e5c158; /* Noirのゴールド色 */
+  font-size: 2.5rem;
+  font-weight: bold;
 }
 
+/* 天気カード */
 .weatherCard {
-  /* 基盤側で一括管理するため指定なし */
+  composes: card;
+}
+.weatherInfo {
+  font-size: 1.1rem;
 }
 
-.cardTitle {
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin: 0 0 8px 0;
+/* GitHubカード */
+.githubFullCard {
+  composes: card;
+}
+.githubTitle {
+  font-size: 1.1rem;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.githubSub {
+  font-size: 0.75rem;
+  font-style: italic;
+  opacity: 0.7;
+}
+.memberList {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* クイックリンク全体のカード */
+.quickLinkCard {
+  composes: card;
+  display: flex;
+  align-items: center;
+  gap: 24px; /* 「クイックリンク」の文字とアイテムの間の隙間 */
+  padding: 12px 16px;
+}
+/* 「クイックリンク」の見出し文字 */
+.quickLinkTitle {
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: #ffffff;
+  white-space: nowrap; /* 画面が狭くなっても改行させない */
+}
+
+/* リンクをまとめるコンテナ */
+.quickLinkItems {
+  display: flex;
+  flex-wrap: wrap; /* スマホなど画面が狭いときは自動で折り返す */
+  gap: 20px;       /* リンク同士の間隔 */
+  align-items: center;
+}
+
+/* 個々のリンクボタン */
+.quickLinkItem {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* アイコンと文字の間の隙間 */
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.95rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+/* マウスを載せたとき（ホバー時）の演出 */
+.quickLinkItem:hover {
+  background-color: rgba(255, 255, 255, 0.1); /* ほんのり背景を明るく */
+  opacity: 0.9;
+}
+
+/* アイコン（公式ロゴ画像）のサイズと調整 */
+.linkIcon {
+  width: 18px;         /* アイコンの横幅（文字の大きさに合わせる） */
+  height: 18px;        /* アイコンの縦幅 */
+  object-fit: contain; /* 画像が歪まないように収める */
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* スケジュール */
+.scheduleCard {
+  composes: card;
+}
+.scheduleTitle {
+  font-style: italic;
   opacity: 0.8;
 }
+.scheduleDate {
+  font-size: 1.2rem;
+  margin: 4px 0 12px 0;
+}
 
-/* スケジュール内のチェックボックス一覧 */
+/* タイムラインの簡易再現 */
+.timelineContainer {
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  padding-top: 8px;
+}
+.timelineHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+.timelineBarWrapper {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px;
+  position: relative;
+}
+.timelineBar {
+  background: #4d4ae8; /* 青いスケジュールバー */
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  width: 60%; /* 横幅の目安 */
+  margin-left: 20%; /* 開始位置の目安 */
+}
+
+/* ToDo */
+.todoCard {
+  composes: card;
+}
+.todoTitle {
+  font-style: italic;
+  opacity: 0.8;
+  margin-bottom: 8px;
+}
 .todoList {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-
 .todoLabel {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.875rem;
   cursor: pointer;
 }
-
-.todoLabel input {
-  width: 16px;
-  height: 16px;
-  cursor: pointer;
-  appearance: checkbox;
-  accent-color: #22c55e;
-}
-
 .completed {
   text-decoration: line-through;
   opacity: 0.5;
 }
 
-/* 天気情報のテキスト */
-.weatherInfo {
-  font-size: 1.125rem;
-  font-weight: bold;
-  margin: 4px 0;
-}
-
-.weatherDetail {
-  font-size: 0.75rem;
-  opacity: 0.7;
-  margin: 0;
-}
-
-/* 中段：ニュースカード（横幅いっぱい） */
+/* ニュース */
 .newsCard {
-  background: linear-gradient(135deg, #121212, #1a1a1a) !important;
-  color: #e2e8f0;
-  border-radius: 16px;
-  padding: 20px; /* サイズ維持 */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  min-height: 120px; /* サイズ維持 */
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  composes: card;
 }
-
 .newsList {
   list-style: none;
   padding: 0;
-  margin: 12px 0 0 0;
+  margin: 8px 0 0 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-size: 0.875rem;
 }
-
-.newsItem {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
-  opacity: 0.9;
+.newsLink {
+  color: #ffffff;
+  text-decoration: none;
 }
-
 .newsLink:hover {
-  text-decoration: underline !important;
-  opacity: 0.7;
+  text-decoration: underline;
 }
 
-/* GitHubカード */
-.githubFullCard {
-  background: linear-gradient(135deg, #121212, #1a1a1a) !important;
-  color: #e2e8f0;
-  border-radius: 16px;
-  padding: 20px; /* サイズ維持 */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
 
-.githubTitle {
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin: 0 0 12px 0;
-  opacity: 0.8;
-}
+/* ==========================================================================
+   💻 画面幅が広いPC用のスタイル（ブレイクポイント: 768px以上）
+   ========================================================================== */
+@media (min-width: 768px) {
+  /* PC時は元の左右2カラム構造に戻す */
+  .mainGrid {
+    display: grid;
+    grid-template-columns: 1fr 3fr;
+    gap: 16px;
+  }
 
-.memberList {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+  /* 左カラムと右カラムの枠組みをPC用に復活させる */
+  .leftColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    grid-column: 1; /* グリッドの1列目（左）に配置 */
+  }
 
-.memberItem {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  padding-bottom: 6px;
-}
+  .rightColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    grid-column: 2; /* グリッドの2列目（右）に配置 */
+  }
 
-.memberItem:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
+  /* PC時はスマホ用の並び順(order)をすべて解除して、HTMLの並び順に戻す */
+  .aiChatFullCard,
+  .quickLinkCard,
+  .scheduleTodoGrid,
+  .weatherCard,
+  .newsCard,
+  .githubFullCard,
+  .scheduleCard,
+  .todoCard {
+    order: unset;
+  }
+  
+  /* PC時はGitHubを下に引き伸ばす */
+  .githubFullCard {
+    flex-grow: 1;
+  }
 
-.memberMain {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: bold;
-  font-size: 0.875rem;
-}
-
-.statusDot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.online { background-color: #22c55e; }
-.away { background-color: #eab308; }
-.offline { background-color: #94a3b8; }
-
-.lastActivity {
-  font-size: 0.75rem;
-  opacity: 0.7;
+  /* スケジュールとToDoをPCの時だけ「2 : 1」で横並びにする */
+  .scheduleTodoGrid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+  }
 }

@@ -17,7 +17,7 @@ const REGION_OPTIONS = [
   { id: 'okinawa', name: '那覇', lat: '26.2124', lon: '127.6809' },
 ];
 
-// ⭕ GNewsで利用可能なニュースジャンルの一覧
+// GNewsで利用可能なニュースジャンルの一覧
 const NEWS_CATEGORY_OPTIONS = [
   { id: 'general', name: '総合' },
   { id: 'technology', name: 'テクノロジー' },
@@ -35,13 +35,13 @@ export default function SettingsPage() {
   const [aiDaily, setAiDaily] = useState(true);
   const [notifications, setNotifications] = useState(true);
   
-  // GitHubリポジトリ名の状態管理
-  const [githubRepo, setGithubRepo] = useState('haru200453/tasseitai');
+  // 💡 修正1: GitHubリポジトリ名の初期状態をデフォルトなし（空っぽ）に変更
+  const [githubRepo, setGithubRepo] = useState('');
 
   // 天気表示用地域の状態管理（デフォルトは大阪）
   const [weatherRegion, setWeatherRegion] = useState('osaka');
 
-  // ⭕ ニュースジャンルの状態管理を追加（デフォルトは総合）
+  // ニュースジャンルの状態管理（デフォルトは総合）
   const [newsCategory, setNewsCategory] = useState('general');
 
   // 起動時にLocalStorageから設定を復元
@@ -51,23 +51,19 @@ export default function SettingsPage() {
     const savedNotif = localStorage.getItem('setting_notifications');
     const savedRepo = localStorage.getItem('setting_githubRepo');
     const savedRegion = localStorage.getItem('setting_weatherRegion');
-    
-    // ⭕ 保存されたニュースジャンルの取得
     const savedCategory = localStorage.getItem('setting_newsCategory');
 
     setAiBusiness(savedBusiness !== null ? JSON.parse(savedBusiness) : true);
     setAiDaily(savedDaily !== null ? JSON.parse(savedDaily) : true);
     setNotifications(savedNotif !== null ? JSON.parse(savedNotif) : true);
     
-    if (savedRepo !== null) {
-      setGithubRepo(savedRepo);
-    }
+    // 💡 修正2: 保存されたデータがあればそれを入れ、無ければ確実に空っぽにする
+    setGithubRepo(savedRepo !== null ? savedRepo : '');
 
     if (savedRegion !== null) {
       setWeatherRegion(savedRegion);
     }
 
-    // ⭕ 保存されたジャンルがあればStateにセット
     if (savedCategory !== null) {
       setNewsCategory(savedCategory);
     }
@@ -102,12 +98,12 @@ export default function SettingsPage() {
     }
   };
 
-  // ⭕ ニュースジャンルを変更し保存する関数
+  // ニュースジャンルを変更し保存する関数
   const handleCategoryChange = (categoryId: string) => {
     setNewsCategory(categoryId);
     localStorage.setItem('setting_newsCategory', categoryId);
     
-    // 💡 ジャンルが変わったら古いキャッシュを削除して、次回ホーム画面で強制リフレッシュさせる
+    // ジャンルが変わったら古いキャッシュを削除して、次回ホーム画面で強制リフレッシュさせる
     localStorage.removeItem('cache_newsData');
     localStorage.removeItem('cache_newsTimestamp');
   };
@@ -180,15 +176,16 @@ export default function SettingsPage() {
           <div className={styles.rowContainer}>
             <div className={styles.inputRow}>
               <label className={styles.subLabel} htmlFor="weatherRegionSelect">表示地域</label>
+              {/* 💡 修正3: select内のoptionテキストがダーク背景で見えなくならないようにスタイルをケア */}
               <select
                 id="weatherRegionSelect"
                 className={styles.textField}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)' }}
                 value={weatherRegion}
                 onChange={(e) => handleRegionChange(e.target.value)}
               >
                 {REGION_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
+                  <option key={option.id} value={option.id} style={{ color: '#000000' }}>
                     {option.name}
                   </option>
                 ))}
@@ -199,7 +196,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* ⭕ 新設：ニュースジャンル設定セクション（地域設定の下に配置） */}
+      {/* ニュースジャンル設定セクション */}
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>ニュース設定</span>
@@ -209,12 +206,12 @@ export default function SettingsPage() {
               <select
                 id="newsCategorySelect"
                 className={styles.textField}
-                style={{ cursor: 'pointer' }}
+                style={{ cursor: 'pointer', color: '#ffffff', backgroundColor: 'rgba(255, 255, 255, 0.07)' }}
                 value={newsCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
               >
                 {NEWS_CATEGORY_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
+                  <option key={option.id} value={option.id} style={{ color: '#000000' }}>
                     {option.name}
                   </option>
                 ))}

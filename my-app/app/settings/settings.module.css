@@ -1,192 +1,168 @@
 .container {
-    min-height: 100vh;
-    background-color: var(--background) !important;
-    color: var(--foreground) !important;
-    padding: 16px; /* ⭕ ホーム画面（home.module.css）と完全に同じ「16px」に統一します */
-    font-family: sans-serif;
-    max-width: 530px; /* これで最大横幅がホームと100%一致します */
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 36px;
-    box-sizing: border-box;
-  }
-  
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    position: relative;
-    padding: 4px 4px; /* ⭕ ヘッダーの内側余白もホームとお揃いに */
-  }
-  
-  .backBtn {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    color: var(--foreground);
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-  }
-  
-  .title {
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin: 0;
-  }
-  
-  /* セクション配置 */
-  .section {
-    display: flex;
-    flex-direction: column;
-    padding: 0 4px; /* ⭕ 左右の端に少しだけ余裕を持たせます */
-  }
-  
-  .sectionHeader {
-    display: flex;
-    align-items: flex-start;
-    gap: 16px; /* ⭕ 横幅を広げるために、ラベルとトグルの間の隙間を「24px」から「16px」に少し狭めます */
-  }
-  
-  .sectionTitle {
-    font-size: 1rem;
-    font-weight: bold;
-    color: var(--foreground);
-    min-width: 70px; /* ⭕ 「AI設定」などの文字幅を少しだけコンパクトにして、右側のスイッチの領域を広げます */
-    padding-top: 2px;
-  }
-  
-  .rowContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    flex-grow: 1;
-  }
-  
-  /* 各設定行 */
-  .settingRow {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-grow: 1;
-  }
-  
-  .settingRowInline {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-  }
-  
-  .inlineContent {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-grow: 1;
-  }
-  
-  .subLabel {
-    font-size: 1rem;
-    color: var(--foreground); /* 各項目の文字色もモードに連動 */
-  }
-  
-  /* ON/OFFテキストとスイッチの並び */
-  .toggleWrapper {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .textOn {
-    font-size: 0.8rem;
-    font-weight: bold;
-    color: #22c55e;        /* ワイヤーフレーム通りの緑文字ON */
-    width: 30px;            /* 文字幅を「30px」に固定して画面のブレを防止 */
-    display: inline-block;
-    text-align: center;
-  }
-  
-  .textOff {
-    font-size: 0.8rem;
-    font-weight: bold;
-    color: #3b82f6;        /* ワイヤーフレーム通りの青文字OFF */
-    width: 30px;            /* ONと同じ「30px」に固定して画面のブレを防止 */
-    display: inline-block;
-    text-align: center;
-  }
-  
-  /* トグルスイッチ */
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 22px;
-  }
-  
-  .switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-  
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #cbd5e1;
-    transition: .2s;
-    border-radius: 22px;
-  }
-  
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 16px;
-    width: 16px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .2s;
-    border-radius: 50%;
-  }
-  
-  .switch input:checked + .slider {
-    background-color: #22c55e; /* ONのときは背景もお揃いのきれいな緑に */
-  }
-  
-  .switch input:checked + .slider:before {
-    transform: translateX(22px);
-  }
-  
-  /* 下段ボタン */
-  .dangerSection {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 20px;
-    margin-top: 12px;
-  }
-  
-  .dangerBtn {
-    background: none;
-    border: none;
-    padding: 0;
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #ef4444; /* ログアウト、アカウント削除の赤文字 */
-    cursor: pointer;
-    text-align: left;
-  }
-  
-  .dangerBtn:active {
-    opacity: 0.6;
-  }
-  /* ⭕ GitHub入力フォーム用のスタイル */
+  width: 100%;
+  margin: 0;
+  padding: 24px 16px;
+  background-color: #3b3a4e; /* 🏠 ホーム画面とお揃いの背景色 */
+  min-height: 100vh;
+  color: #ffffff;
+  font-family: sans-serif;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  padding: 4px 4px;
+  margin-bottom: 24px;
+}
+
+.backBtn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #ffffff; /* 矢印をくっきり白に */
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 0;
+  color: #ffffff; /* タイトルをくっきり白に */
+}
+
+/* 🧱 セクション配置 */
+.section {
+  display: flex;
+  flex-direction: column;
+  padding: 20px; /* 少し余白を広げて見やすく */
+  background-color: rgba(255, 255, 255, 0.06); /* ホームに合わせた薄い透過背景 */
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.sectionTitle {
+  font-size: 1rem;
+  font-weight: bold;
+  color: #ffffff; /* ✨ 左側のメインタイトル（AI設定、地域設定など）をくっきり白に！ */
+  min-width: 90px; /* ⭕ 横幅を「70px」から「90px」に広げて、文字の潰れを完全に解消 */
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.rowContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex-grow: 1;
+}
+
+/* 各設定行 */
+.settingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-grow: 1;
+}
+
+.settingRowInline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.subLabel {
+  font-size: 0.95rem;
+  color: #ffffff; /* ✨ 「ビジネス用」「日常生活用」などの文字をくっきり白に！ */
+}
+
+/* ON/OFFテキストとスイッチの並び */
+.toggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.textOn {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #22c55e;
+  width: 30px;
+  display: inline-block;
+  text-align: center;
+}
+
+.textOff {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: #3b82f6;
+  width: 30px;
+  display: inline-block;
+  text-align: center;
+}
+
+/* トグルスイッチ */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.3); /* OFFの時のスイッチの土台を見やすく調整 */
+  transition: .2s;
+  border-radius: 22px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .2s;
+  border-radius: 50%;
+}
+
+.switch input:checked + .slider {
+  background-color: #22c55e;
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(22px);
+}
+
+/* 💻 GitHub・プルダウン入力フォーム用のスタイル */
 .inputRow {
   display: flex;
   flex-direction: column;
@@ -196,28 +172,59 @@
 
 .textField {
   width: 100%;
-  padding: 10px 12px;
-  background-color: rgba(255, 255, 255, 0.05); /* ほんのり透けるダーク背景 */
-  border: 1px solid rgba(255, 255, 255, 0.15); /* 主張しすぎない境界線 */
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.08); /* 入力欄自体の背景を少し明るく */
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  color: var(--foreground);
+  color: #ffffff; /* 入力・選択された文字を白に固定 */
   font-size: 0.95rem;
   box-sizing: border-box;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-/* 入力欄をクリック（フォーカス）した時のネオンエフェクト */
 .textField:focus {
   outline: none;
-  border-color: #3b82f6; /* 青文字OFFなどと色相を合わせたクールブルー */
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+  border-color: #3b82f6;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
 }
 
-/* ヒントテキストの装飾 */
+/* 💡 注釈・ヒントテキストの装飾 */
 .inputHelp {
-  font-size: 0.75rem;
-  color: var(--foreground);
-  opacity: 0.5;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7); /* ✨ 薄すぎて消えていた「※ ホーム画面に〜」の文字を明るい白に！ */
   margin: 0;
   padding-left: 2px;
+}
+
+/* 🚨 下段ボタンエリア（ログアウト） */
+.dangerSection {
+  display: flex;
+  justify-content: center; /* ⭕ 横方向を中央寄せにする */
+  align-items: center;
+  margin-top: 40px;        /* 上のコンテンツと少し距離を置く */
+  margin-bottom: 40px;
+  width: 100%;
+}
+
+.dangerBtn {
+  background: none;
+  border: 2px solid #ef4444; /* ⭕ ボタンらしさを出すために、赤枠のスタイリッシュなデザインに */
+  padding: 12px 40px;        /* 内側に余白を作って押しやすく */
+  font-size: 1rem;
+  font-weight: bold;
+  color: #ef4444;            /* 赤文字 */
+  border-radius: 30px;       /* きれいな丸薬型カプセルボタンに */
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s, color 0.2s, opacity 0.2s;
+}
+
+/* ボタンを触ったときのエフェクト */
+.dangerBtn:hover {
+  background-color: #ef4444; /* 背景が赤色に染まる */
+  color: #ffffff;            /* 文字が白色に */
+}
+
+.dangerBtn:active {
+  opacity: 0.8;
 }
