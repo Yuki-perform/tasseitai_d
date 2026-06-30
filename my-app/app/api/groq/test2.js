@@ -1,4 +1,4 @@
-import { generateText, buildNotionPrompt } from "./groq.js";
+import { generateText, buildNotionPrompt } from "./groq_prompt.js";
 
 async function testGroqCall() {
   console.log("=== Groq API テスト開始 ===\n");
