@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { AuthProvider } from "./providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,8 +26,7 @@ export default function RootLayout({
   return (
     <html lang="ja" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body className="min-h-full flex flex-col">
-        {/* ➔ 邪魔だったProviderを消してすっきり */}
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
