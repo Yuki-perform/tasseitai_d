@@ -1,14 +1,36 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, Suspense } from "react";
 import styles from "./login.module.css";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const error = searchParams.get("error");
+
+  useEffect(() => {
+    if (error) {
+      router.replace("/notion-logout");
+    }
+  }, [error, router]);
+
   const handleLogin = async () => {
     await signIn("notion", {
       callbackUrl: "/home",
     });
   };
+
+  if (error) {
+    return (
+      <main className="container">
+        <div className={styles.card}>
+          <p>別アカウントへ切り替え中...</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     // 元の "container" を styles.container に変更し、背景色などを適用できるようにしました
@@ -33,5 +55,13 @@ export default function LoginPage() {
         </button>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

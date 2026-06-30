@@ -7,14 +7,14 @@ import styles from './settings.module.css';
 
 // 選択肢となる地域データの一覧
 const REGION_OPTIONS = [
-  { id: 'sapporo', name: '札幌', lat: '43.0621', lon: '141.3544' },
-  { id: 'sendai', name: '仙台', lat: '38.2682', lon: '140.8694' },
-  { id: 'tokyo', name: '東京', lat: '35.6895', lon: '139.6917' },
-  { id: 'nagoya', name: '名古屋', lat: '35.1815', lon: '136.9066' },
-  { id: 'osaka', name: '大阪', lat: '34.6937', lon: '135.5023' },
-  { id: 'hiroshima', name: '広島', lat: '34.3853', lon: '132.4553' },
-  { id: 'fukuoka', name: '福岡', lat: '33.5904', lon: '130.4017' },
-  { id: 'okinawa', name: '那覇', lat: '26.2124', lon: '127.6809' },
+  { id: 'sapporo', name: 'Sapporo', lat: '43.0621', lon: '141.3544' },
+  { id: 'sendai', name: 'Sendai', lat: '38.2682', lon: '140.8694' },
+  { id: 'tokyo', name: 'Tokyo', lat: '35.6895', lon: '139.6917' },
+  { id: 'nagoya', name: 'Nagoya', lat: '35.1815', lon: '136.9066' },
+  { id: 'osaka', name: 'Osaka', lat: '34.6937', lon: '135.5023' },
+  { id: 'hiroshima', name: 'Hiroshima', lat: '34.3853', lon: '132.4553' },
+  { id: 'fukuoka', name: 'Fukuoka', lat: '33.5904', lon: '130.4017' },
+  { id: 'okinawa', name: 'Okinawa', lat: '26.2124', lon: '127.6809' },
 ];
 
 // GNewsで利用可能なニュースジャンルの一覧

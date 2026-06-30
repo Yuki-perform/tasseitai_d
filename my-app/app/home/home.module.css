@@ -98,7 +98,6 @@
 }
 .githubTitle {
   font-size: 1.1rem;
-  font-weight: bold;
   margin-bottom: 4px;
 }
 .githubSub {
@@ -123,7 +122,6 @@
 }
 /* 「クイックリンク」の見出し文字 */
 .quickLinkTitle {
-  font-weight: bold;
   font-size: 0.95rem;
   color: #ffffff;
   white-space: nowrap; /* 画面が狭くなっても改行させない */
@@ -170,8 +168,7 @@
   composes: card;
 }
 .scheduleTitle {
-  font-style: italic;
-  opacity: 0.8;
+  opacity: 1.0;
 }
 .scheduleDate {
   font-size: 1.2rem;
@@ -210,8 +207,7 @@
   composes: card;
 }
 .todoTitle {
-  font-style: italic;
-  opacity: 0.8;
+  opacity: 1.0;
   margin-bottom: 8px;
 }
 .todoList {
