@@ -1,16 +1,14 @@
 // 使い方：このファイルから必要な関数をインポートして使用します。
 // 例：
-// import { getSavedNotionTestData, queryNotionDatabase, searchNotionPages } from "./notion.js";
+// import { getSavedNotionTestData, searchNotionPages } from "./notion.js";
 //
 // getSavedNotionTestData() - テスト用の保存済みNotionデータを取得します。
-// queryNotionDatabase(apiKey, databaseId) - Notionデータベースを検索します。
-// searchNotionPages(apiKey, query) - Notionページ検索を実行します。
-// collectNotionPageInfo(page) - Notionページのメタ情報／プロパティ一覧を整形します。
+// searchNotionPages(apiKey, query) - Notionワークスペース内のページ／データベースを検索します。
+// collectNotionPageInfo(page) - Notionページ／データベースのメタ情報／プロパティ一覧を整形します。
 
 const defaultNotionVersion = "2022-06-28";
 
 const apiKey = process.env.NOTION_API_KEY;
-const databaseId = process.env.NOTION_DATABASE_ID;
 
 function buildHeaders(key) {
   return {
@@ -118,16 +116,15 @@ function parseInput(argv, name, envName) {
 }
 
 export function getNotionFetchOptions(argv = process.argv, env = process.env) {
+  void env;
   const apiKeyValue = parseInput(argv, "apiKey", "NOTION_API_KEY");
-  const databaseIdValue = parseInput(argv, "databaseId", "NOTION_DATABASE_ID");
   const query = parseInput(argv, "query", "NOTION_QUERY") || "";
-  const searchType = parseInput(argv, "searchType", "NOTION_SEARCH_TYPE") === "search" ? "search" : "database";
+  const searchType = parseInput(argv, "searchType", "NOTION_SEARCH_TYPE") === "search" ? "search" : "workspace";
   const pageSize = Number(parseInput(argv, "pageSize", "NOTION_PAGE_SIZE") || 10);
   const maxPages = Number(parseInput(argv, "maxPages", "NOTION_MAX_PAGES") || 2);
 
   return {
     apiKeyValue,
-    databaseIdValue,
     query,
     searchType,
     pageSize,
@@ -138,16 +135,14 @@ export function getNotionFetchOptions(argv = process.argv, env = process.env) {
 export async function getNotionPagesOutput(options = {}) {
   const {
     apiKeyValue,
-    databaseIdValue,
     query = "",
-    searchType = "database",
+    searchType = "workspace",
     pageSize = 50,
     maxPages = 3,
   } = options;
 
   const formatted = await fetchNotionPages({
     apiKeyValue,
-    databaseIdValue,
     query,
     searchType,
     pageSize,
@@ -161,12 +156,6 @@ export async function runNotionFetchTest(argv = process.argv, env = process.env)
   const options = getNotionFetchOptions(argv, env);
   if (!options.apiKeyValue) {
     throw new Error("apiKey が必要です。例: node test.js apiKey=your-token");
-  }
-  if (options.searchType === "database" && !options.databaseIdValue) {
-    throw new Error("databaseId が必要です。例: node test.js databaseId=your-database-id");
-  }
-  if (options.searchType === "search" && !options.query) {
-    throw new Error("query が必要です。例: node test.js searchType=search query=検索語");
   }
 
   const result = await getNotionPagesOutput(options);
@@ -193,12 +182,17 @@ export function extractNotionTitle(page) {
     return plainTextFromRichText(titleProperty.title);
   }
 
+  if (Array.isArray(page.title)) {
+    return plainTextFromRichText(page.title);
+  }
+
   return page.url || page.id || "";
 }
 
 export function collectNotionPageInfo(page) {
   return {
     id: page.id,
+    object: page.object ?? null,
     url: page.url ?? null,
     title: extractNotionTitle(page),
     parent: page.parent ?? null,
@@ -247,59 +241,32 @@ async function fetchNotionJson(url, apiKey, body) {
     throw new Error(`Notion API error: ${response.status} ${response.statusText} - ${errorText}`);
   }
 
-  console.log(response);
   return response.json();
 }
 
 export async function queryNotionDatabase(
   apiKeyValue,
-  databaseIdValue,
+  _databaseIdValue,
   pageSize = 50,
   maxPages = 5,
   filter = null,
   sorts = null
 ) {
-  const results = [];
-  let nextCursor = null;
-  const safePageSize = Math.min(Math.max(pageSize, 1), 100);
-  const safeMaxPages = Math.min(Math.max(maxPages, 1), 20);
-
-  do {
-    const body = {
-      page_size: safePageSize,
-    };
-    if (filter) body.filter = filter;
-    if (sorts) body.sorts = sorts;
-    if (nextCursor) body.start_cursor = nextCursor;
-
-    const data = await fetchNotionJson(
-      `https://api.notion.com/v1/databases/${databaseIdValue}/query`,
-      apiKeyValue,
-      body
-    );
-
-    if (Array.isArray(data.results)) {
-      results.push(...data.results);
-    }
-    nextCursor = data.next_cursor;
-  } while (nextCursor && results.length < safePageSize * safeMaxPages);
-
-  return results;
+  void filter;
+  void sorts;
+  return searchNotionWorkspace(apiKeyValue, "", pageSize, maxPages);
 }
 
-export async function searchNotionPages(apiKeyValue, query, pageSize = 50, maxPages = 3) {
+export async function searchNotionWorkspace(apiKeyValue, query = "", pageSize = 50, maxPages = 3) {
   const results = [];
   let nextCursor = null;
   const safePageSize = Math.min(Math.max(pageSize, 1), 100);
   const safeMaxPages = Math.min(Math.max(maxPages, 1), 10);
+  let requestCount = 0;
 
   do {
     const body = {
       query,
-      filter: {
-        value: "page",
-        property: "object",
-      },
       page_size: safePageSize,
     };
     if (nextCursor) body.start_cursor = nextCursor;
@@ -310,16 +277,20 @@ export async function searchNotionPages(apiKeyValue, query, pageSize = 50, maxPa
       results.push(...data.results);
     }
     nextCursor = data.next_cursor;
-  } while (nextCursor && results.length < safePageSize * safeMaxPages);
+    requestCount += 1;
+  } while (nextCursor && requestCount < safeMaxPages);
 
   return results;
 }
 
+export async function searchNotionPages(apiKeyValue, query = "", pageSize = 50, maxPages = 3) {
+  return searchNotionWorkspace(apiKeyValue, query, pageSize, maxPages);
+}
+
 export async function fetchNotionPages({
   apiKeyValue,
-  databaseIdValue,
   query = "",
-  searchType = "database",
+  searchType = "workspace",
   pageSize = 50,
   maxPages = 3,
 }) {
@@ -327,11 +298,8 @@ export async function fetchNotionPages({
     throw new Error("apiKeyValue is required to fetch Notion pages.");
   }
 
-  const source = searchType === "search" ? "search" : "database";
-  const pages =
-    source === "search"
-      ? await searchNotionPages(apiKeyValue, query, pageSize, maxPages)
-      : await queryNotionDatabase(apiKeyValue, databaseIdValue, pageSize, maxPages);
+  const source = searchType === "search" ? "search" : "workspace";
+  const pages = await searchNotionWorkspace(apiKeyValue, query, pageSize, maxPages);
 
   const results = pages.map((page) => collectNotionPageInfo(page));
   return {
@@ -341,4 +309,4 @@ export async function fetchNotionPages({
   };
 }
 
-export { apiKey, databaseId };
+export { apiKey };
