@@ -15,10 +15,29 @@ type ExtendedSession = Session & {
   };
 };
 
+const normalizeBaseUrl = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+
+  const withoutTrailingSlash = trimmed.replace(/\/+$/, "");
+
+  try {
+    const parsed = new URL(withoutTrailingSlash);
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return withoutTrailingSlash;
+  }
+};
+
 const getBaseUrl = () => {
-  if (process.env.NEXTAUTH_URL) return process.env.NEXTAUTH_URL;
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "https://tasseitai-d.vercel.app";
+  const configuredUrl = normalizeBaseUrl(
+    process.env.NEXTAUTH_URL ||
+      process.env.AUTH_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined)
+  );
+
+  return configuredUrl ?? "https://tasseitai-d.vercel.app";
 };
 
 const notionRedirectUri = `${getBaseUrl()}/api/auth/callback/notion`;
