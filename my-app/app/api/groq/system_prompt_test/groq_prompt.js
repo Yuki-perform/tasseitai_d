@@ -4,7 +4,7 @@
 //
 // 例：test.js での呼び出し例があります。参考にしてください。
 
-import { runNotionFetchTest } from "../notion/notion.js";
+import { runNotionFetchTest } from "../../notion/notion.js";
 
 // Notionデータを取得する関数（遅延実行）
 async function fetchNotionData(accessToken) {

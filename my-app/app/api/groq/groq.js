@@ -3,34 +3,76 @@
 // その後、generateText関数を呼び出すだけです。
 //
 // 例：test.js での呼び出し例があります。参考にしてください。
-import { runNotionFetchTest } from "../notion/notion.js";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { fetchNotionPages } from "../notion/notion.js";
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+
+async function loadPromptTemplate(fileName) {
+  const candidatePaths = [
+    path.join(currentDir, fileName),
+    path.join(currentDir, "..", "notion", fileName),
+    path.join(currentDir, "..", "groq", fileName),
+  ];
+
+  let lastError;
+  for (const candidatePath of candidatePaths) {
+    try {
+      return await readFile(candidatePath, "utf8");
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError ?? new Error(`Prompt template not found: ${fileName}`);
+}
+
+function normalizeText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeToolName(rawText) {
+  const text = normalizeText(rawText).toLowerCase();
+  if (!text) return null;
+  if (text.includes("notion_search")) return "notion_search";
+  if (text.includes("notion_update")) return "notion_update";
+  if (/(none|不要|なし|not needed|tool not needed)/.test(text)) return null;
+  return null;
+}
 
 // Notionデータを取得する関数（遅延実行）
-async function fetchNotionData(accessToken) {
+async function fetchNotionData(accessToken, query = "") {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
   try {
-    const data = await runNotionFetchTest([`accessToken=${accessToken}`], {});
+    const data = await fetchNotionPages({
+      accessToken,
+      query,
+      pageSize: 10,
+      maxPages: 2,
+    });
     return {
       ...data,
-      results: data.results.map(item => ({
+      results: (data?.results || []).map((item) => ({
         properties: item.properties,
-        propertiesList: item.propertiesList
-      }))
+        propertiesList: item.propertiesList,
+      })),
     };
   } catch (error) {
-    console.error("Notionデータ取得エラー:", error.message);
+    console.error("Notionデータ取得エラー:", error instanceof Error ? error.message : String(error));
     return { results: [] };
   }
 }
-
 
 // Node標準fetchを使う
 //入力: promptText (string) - ユーザからの質問や指示
 //出力: 生成されたテキスト (string) - GROQ APIからの応答
 export async function generateText(promptText) {
-  if (typeof promptText !== "string" || promptText.trim() === "") {
+  const normalizedPromptText = normalizeText(promptText);
+  if (!normalizedPromptText) {
     throw new Error("generateText requires a non-empty string promptText argument");
   }
 
@@ -46,12 +88,12 @@ export async function generateText(promptText) {
     res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${groqApiKey}`,
+        Authorization: `Bearer ${groqApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
-        messages: [{ role: "user", content: promptText.trim() }],
+        messages: [{ role: "user", content: normalizedPromptText }],
       }),
     });
   } catch (error) {
@@ -69,20 +111,43 @@ export async function generateText(promptText) {
     : "";
 }
 
+export async function buildToolCallPrompt(userMessage) {
+  const template = await loadPromptTemplate("tool_call_prompt.txt");
+  const message = normalizeText(userMessage);
+  return [
+    template
+      .replaceAll("{{user_message}}", message)
+      .replaceAll("{{tool_name}}", "")
+      .replaceAll("{{tool_result}}", ""),
+    "",
+    `ユーザー入力: ${message}`,
+    "",
+    "判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。",
+  ].join("\n");
+}
+
+export async function buildRecallPrompt(userMessage, toolName, toolResult) {
+  const template = await loadPromptTemplate("re_call_prompt.txt");
+  return template
+    .replaceAll("{{user_message}}", normalizeText(userMessage))
+    .replaceAll("{{tool_name}}", normalizeText(toolName))
+    .replaceAll("{{tool_result}}", normalizeText(toolResult));
+}
+
 async function buildNotionPrompt(question, accessToken) {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
-  const questionText = typeof question === "string" ? question.trim() : "";
+  const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
-  
-  const notionData = await fetchNotionData(accessToken);
+
+  const notionData = await fetchNotionData(accessToken, questionText);
   const propertiesList = (notionData?.results || [])
-    .flatMap(result => result.propertiesList || [])
+    .flatMap((result) => result.propertiesList || [])
     .flat();
-  const propertiesText = propertiesList.join('\n');
+  const propertiesText = propertiesList.join("\n");
 
   return [
     "以下は Notion データベースから取得した情報の一覧です。",
@@ -101,14 +166,38 @@ export async function generateTextFromNotionData(question, accessToken) {
   return generateText(promptText);
 }
 
-// テスト用ヘルパー関数：モックデータを使用したプロンプト構築
-export async function buildNotionPromptWithMockData(question, mockNotionDataList = []) {
-  const questionText = typeof question === "string" ? question.trim() : "";
+export async function generateTextWithNotionWorkflow(question, accessToken) {
+  const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
-  
-  const propertiesText = mockNotionDataList.join('\n');
+
+  const toolCallPrompt = await buildToolCallPrompt(questionText);
+  const toolDecision = await generateText(toolCallPrompt);
+  const toolName = normalizeToolName(toolDecision);
+
+  if (!toolName) {
+    return generateText(questionText);
+  }
+
+  const notionData = await fetchNotionData(accessToken, questionText);
+  const recallPrompt = await buildRecallPrompt(
+    questionText,
+    toolName,
+    JSON.stringify(notionData, null, 2)
+  );
+
+  return generateText(recallPrompt);
+}
+
+// テスト用ヘルパー関数：モックデータを使用したプロンプト構築
+export async function buildNotionPromptWithMockData(question, mockNotionDataList = []) {
+  const questionText = normalizeText(question);
+  if (!questionText) {
+    throw new Error("質問文が必要です");
+  }
+
+  const propertiesText = mockNotionDataList.join("\n");
 
   return [
     "以下は Notion データベースから取得した情報の一覧です。",

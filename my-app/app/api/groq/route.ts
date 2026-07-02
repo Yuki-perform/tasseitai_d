@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { generateText, generateTextFromNotionData } from "./groq.js";
+import { generateText, generateTextWithNotionWorkflow } from "./groq.js";
 import { authOptions } from "../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
@@ -12,6 +12,7 @@ export async function POST(request: Request) {
     const question = typeof body?.question === "string" ? body.question.trim() : "";
 
     let content;
+    let res = "";
 
     if (question) {
       // セッションからaccessTokenを取得
@@ -26,14 +27,16 @@ export async function POST(request: Request) {
           { status: 401 }
         );
       }
-      content = await generateTextFromNotionData(question, accessToken);
+      content = await generateTextWithNotionWorkflow(question, accessToken);
+      res = typeof content === "string" ? content : "";
     } else if (prompt) {
       content = await generateText(prompt);
+      res = typeof content === "string" ? content : "";
     } else {
       return NextResponse.json({ error: "prompt または question が必要です" }, { status: 400 });
     }
 
-    return NextResponse.json({ content });
+    return NextResponse.json({ content: res || content });
   } catch (error) {
     const message = error instanceof Error ? error.message : "不明なエラーです";
     return NextResponse.json({ error: message }, { status: 500 });
