@@ -1,11 +1,13 @@
-import { generateText, buildNotionPrompt } from "./groq_prompt.js";
+import { generateText, buildNotionPromptWithMockData } from "./groq_prompt.js";
+import { getSavedNotionTestData } from "../notion/notion.js";
 
 async function testGroqCall() {
   console.log("=== Groq API テスト開始 ===\n");
 
   const chatPronmpt = "ほしいゲームの一覧を教えて";
-  //notionのデータを含める
-  const Pronmpt = await buildNotionPrompt(chatPronmpt);
+  //notionのモックデータを含める
+  const notionData = getSavedNotionTestData();
+  const Pronmpt = await buildNotionPromptWithMockData(chatPronmpt, notionData);
   console.log("テスト用のプロンプト:", chatPronmpt);
   try {
     const result = await generateText(Pronmpt);

@@ -7,9 +7,12 @@
 import { runNotionFetchTest } from "../notion/notion.js";
 
 // Notionデータを取得する関数（遅延実行）
-async function fetchNotionData() {
+async function fetchNotionData(accessToken) {
+  if (!accessToken) {
+    throw new Error("accessToken が必要です");
+  }
   try {
-    const data = await runNotionFetchTest(process.argv, process.env);
+    const data = await runNotionFetchTest([`accessToken=${accessToken}`], {});
     return {
       ...data,
       results: data.results.map(item => ({
@@ -74,13 +77,16 @@ export async function generateText(promptText) {
     : "";
 }
 
-async function buildNotionPrompt(question) {
+async function buildNotionPrompt(question, accessToken) {
+  if (!accessToken) {
+    throw new Error("accessToken が必要です");
+  }
   const questionText = typeof question === "string" ? question.trim() : "";
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
   
-  const notionData = await fetchNotionData();
+  const notionData = await fetchNotionData(accessToken);
   const propertiesList = (notionData?.results || [])
     .flatMap(result => result.propertiesList || [])
     .flat();
@@ -98,8 +104,27 @@ async function buildNotionPrompt(question) {
 
 export { buildNotionPrompt };
 
-export async function generateTextFromNotionData(question, notionDataList) {
-  const promptText = await buildNotionPrompt(question, notionDataList);
+export async function generateTextFromNotionData(question, accessToken) {
+  const promptText = await buildNotionPrompt(question, accessToken);
   return generateText(promptText);
+}
+
+// テスト用ヘルパー関数：モックデータを使用したプロンプト構築
+export async function buildNotionPromptWithMockData(question, mockNotionDataList = []) {
+  const questionText = typeof question === "string" ? question.trim() : "";
+  if (!questionText) {
+    throw new Error("質問文が必要です");
+  }
+  
+  const propertiesText = mockNotionDataList.join('\n');
+
+  return [
+    "以下は Notion データベースから取得した情報の一覧です。",
+    "これらのデータをもとに、質問に回答してください。",
+    "",
+    propertiesText,
+    "",
+    `質問: ${questionText}`,
+  ].join("\n");
 }
 

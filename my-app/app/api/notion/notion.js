@@ -8,11 +8,12 @@
 
 const defaultNotionVersion = "2022-06-28";
 
-const apiKey = process.env.NOTION_API_KEY;
-
-function buildHeaders(key) {
+function buildHeaders(accessToken) {
+  if (!accessToken) {
+    throw new Error("accessToken is required for Notion API authentication");
+  }
   return {
-    Authorization: `Bearer ${key}`,
+    Authorization: `Bearer ${accessToken}`,
     "Notion-Version": defaultNotionVersion,
     "Content-Type": "application/json",
   };
@@ -117,14 +118,14 @@ function parseInput(argv, name, envName) {
 
 export function getNotionFetchOptions(argv = process.argv, env = process.env) {
   void env;
-  const apiKeyValue = parseInput(argv, "apiKey", "NOTION_API_KEY");
+  const accessToken = parseInput(argv, "accessToken", "NOTION_ACCESS_TOKEN");
   const query = parseInput(argv, "query", "NOTION_QUERY") || "";
   const searchType = parseInput(argv, "searchType", "NOTION_SEARCH_TYPE") === "search" ? "search" : "workspace";
   const pageSize = Number(parseInput(argv, "pageSize", "NOTION_PAGE_SIZE") || 10);
   const maxPages = Number(parseInput(argv, "maxPages", "NOTION_MAX_PAGES") || 2);
 
   return {
-    apiKeyValue,
+    accessToken,
     query,
     searchType,
     pageSize,
@@ -134,7 +135,7 @@ export function getNotionFetchOptions(argv = process.argv, env = process.env) {
 
 export async function getNotionPagesOutput(options = {}) {
   const {
-    apiKeyValue,
+    accessToken,
     query = "",
     searchType = "workspace",
     pageSize = 50,
@@ -142,7 +143,7 @@ export async function getNotionPagesOutput(options = {}) {
   } = options;
 
   const formatted = await fetchNotionPages({
-    apiKeyValue,
+    accessToken,
     query,
     searchType,
     pageSize,
@@ -154,8 +155,8 @@ export async function getNotionPagesOutput(options = {}) {
 
 export async function runNotionFetchTest(argv = process.argv, env = process.env) {
   const options = getNotionFetchOptions(argv, env);
-  if (!options.apiKeyValue) {
-    throw new Error("apiKey が必要です。例: node test.js apiKey=your-token");
+  if (!options.accessToken) {
+    throw new Error("accessToken が必要です。例: node test.js accessToken=your-token");
   }
 
   const result = await getNotionPagesOutput(options);
@@ -229,10 +230,10 @@ export function filterNotionPagesByQuery(pages, query) {
   });
 }
 
-async function fetchNotionJson(url, apiKey, body) {
+async function fetchNotionJson(url, accessToken, body) {
   const response = await fetch(url, {
     method: "POST",
-    headers: buildHeaders(apiKey),
+    headers: buildHeaders(accessToken),
     body: JSON.stringify(body),
   });
 
@@ -245,7 +246,7 @@ async function fetchNotionJson(url, apiKey, body) {
 }
 
 export async function queryNotionDatabase(
-  apiKeyValue,
+  accessToken,
   _databaseIdValue,
   pageSize = 50,
   maxPages = 5,
@@ -254,10 +255,10 @@ export async function queryNotionDatabase(
 ) {
   void filter;
   void sorts;
-  return searchNotionWorkspace(apiKeyValue, "", pageSize, maxPages);
+  return searchNotionWorkspace(accessToken, "", pageSize, maxPages);
 }
 
-export async function searchNotionWorkspace(apiKeyValue, query = "", pageSize = 50, maxPages = 3) {
+export async function searchNotionWorkspace(accessToken, query = "", pageSize = 50, maxPages = 3) {
   const results = [];
   let nextCursor = null;
   const safePageSize = Math.min(Math.max(pageSize, 1), 100);
@@ -271,7 +272,7 @@ export async function searchNotionWorkspace(apiKeyValue, query = "", pageSize = 
     };
     if (nextCursor) body.start_cursor = nextCursor;
 
-    const data = await fetchNotionJson("https://api.notion.com/v1/search", apiKeyValue, body);
+    const data = await fetchNotionJson("https://api.notion.com/v1/search", accessToken, body);
 
     if (Array.isArray(data.results)) {
       results.push(...data.results);
@@ -283,23 +284,23 @@ export async function searchNotionWorkspace(apiKeyValue, query = "", pageSize = 
   return results;
 }
 
-export async function searchNotionPages(apiKeyValue, query = "", pageSize = 50, maxPages = 3) {
-  return searchNotionWorkspace(apiKeyValue, query, pageSize, maxPages);
+export async function searchNotionPages(accessToken, query = "", pageSize = 50, maxPages = 3) {
+  return searchNotionWorkspace(accessToken, query, pageSize, maxPages);
 }
 
 export async function fetchNotionPages({
-  apiKeyValue,
+  accessToken,
   query = "",
   searchType = "workspace",
   pageSize = 50,
   maxPages = 3,
 }) {
-  if (!apiKeyValue) {
-    throw new Error("apiKeyValue is required to fetch Notion pages.");
+  if (!accessToken) {
+    throw new Error("accessToken is required to fetch Notion pages.");
   }
 
   const source = searchType === "search" ? "search" : "workspace";
-  const pages = await searchNotionWorkspace(apiKeyValue, query, pageSize, maxPages);
+  const pages = await searchNotionWorkspace(accessToken, query, pageSize, maxPages);
 
   const results = pages.map((page) => collectNotionPageInfo(page));
   return {
@@ -309,4 +310,4 @@ export async function fetchNotionPages({
   };
 }
 
-export { apiKey };
+
