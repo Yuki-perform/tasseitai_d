@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, Suspense } from "react";
 import styles from "./login.module.css";
@@ -9,12 +9,18 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const error = searchParams.get("error");
+  const { status } = useSession();
 
   useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/home");
+      return;
+    }
+
     if (error) {
       router.replace("/notion-logout");
     }
-  }, [error, router]);
+  }, [error, router, status]);
 
   const handleLogin = async () => {
     await signIn("notion", {
