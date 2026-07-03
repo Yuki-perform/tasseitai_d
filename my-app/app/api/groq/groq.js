@@ -130,19 +130,13 @@ export async function generateText(promptText) {
     : "";
 }
 
+//notionに対しsearchかupdateのどちらを使用するべきか判断させる。
+//返り値: notion_search か notion_update のいずれかの文字列
 export async function buildToolCallPrompt(userMessage) {
   const template = await loadPromptTemplate("tool_call_prompt.txt");
-  const message = normalizeText(userMessage);
-  return [
-    template
-      .replaceAll("{{user_message}}", message)
-      .replaceAll("{{tool_name}}", "")
-      .replaceAll("{{tool_result}}", ""),
-    "",
-    `ユーザー入力: ${message}`,
-    "",
-    "判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。",
-  ].join("\n");
+  const usermessage = normalizeText(userMessage);
+  const judgePrompt = "${template}\nユーザー入力:${usermessage}\n判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。返答はnotion_search か notion_update のいずれかの文字列のみで答えてください。" 
+  return generateText(judgePrompt);
 }
 
 export async function buildRecallPrompt(userMessage, toolName, toolResult) {
@@ -185,46 +179,43 @@ export async function generateTextFromNotionData(question, accessToken) {
   return generateText(promptText);
 }
 
+//引数: question ユーザーからの質問
+//返り値:　notionデータを見たうえでの回答
 export async function generateTextWithNotionWorkflow(question, accessToken) {
+  //質問文を成形してquestionTextに格納
   const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
 
-  const toolCallPrompt = await buildToolCallPrompt(questionText);
-  const toolDecision = await generateText(toolCallPrompt);
-  const toolName = normalizeToolName(toolDecision);
+  //toolNameにはsearchかupdateが入る
+  const toolName = await buildToolCallPrompt(questionText);
 
   if (!toolName) {
     return generateText(questionText);
   }
-
   const notionData = await fetchNotionData(accessToken, questionText);
+  const toolResult = "";
+  //updateの場合、更新処理を行う。
+  if (toolName === "notion_update") {
+    //関数未実装--notionに更新処理を行うもの
+    //入力: notionData, questionText
+    //返り値--notionの更新結果->toolResultに格納
+    toolResult = "";
+  }else{
+    //関数未実装--notionに検索処理を行うもの
+    //入力: notionData, questionText
+    //返り値--notionの検索結果->toolResultに格納
+    toolResult = "";
+  }
+
+  //二回目の質問文を作成する。
   const recallPrompt = await buildRecallPrompt(
     questionText,
     toolName,
-    JSON.stringify(notionData, null, 2)
+    toolResult
   );
 
   return generateText(recallPrompt);
-}
-
-// テスト用ヘルパー関数：モックデータを使用したプロンプト構築
-export async function buildNotionPromptWithMockData(question, mockNotionDataList = []) {
-  const questionText = normalizeText(question);
-  if (!questionText) {
-    throw new Error("質問文が必要です");
-  }
-
-  const propertiesText = mockNotionDataList.join("\n");
-
-  return [
-    "以下は Notion データベースから取得した情報の一覧です。",
-    "これらのデータをもとに、質問に回答してください。",
-    "",
-    propertiesText,
-    "",
-    `質問: ${questionText}`,
-  ].join("\n");
 }
 
