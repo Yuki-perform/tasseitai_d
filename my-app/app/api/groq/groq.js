@@ -47,6 +47,7 @@ async function fetchNotionData(accessToken, query = "") {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
+
   try {
     const data = await fetchNotionPages({
       accessToken,
@@ -54,15 +55,33 @@ async function fetchNotionData(accessToken, query = "") {
       pageSize: 10,
       maxPages: 2,
     });
-    return {
-      ...data,
-      results: (data?.results || []).map((item) => ({
-        properties: item.properties,
-        propertiesList: item.propertiesList,
-      })),
-    };
+
+    const results = await Promise.all(
+      (data?.results || []).map(async (item) => {
+        const content = await getPageContent(
+          accessToken,
+          item.id
+        );
+
+        return {
+          title: item.title,
+          url: item.url,
+          lastEdited: item.last_edited_time,
+          properties: item.properties,
+          content,
+        };
+      })
+    );
+
+    return { results };
   } catch (error) {
-    console.error("Notionデータ取得エラー:", error instanceof Error ? error.message : String(error));
+    console.error(
+      "Notionデータ取得エラー:",
+      error instanceof Error
+        ? error.message
+        : String(error)
+    );
+
     return { results: [] };
   }
 }
