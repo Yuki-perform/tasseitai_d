@@ -62,8 +62,12 @@ function buildPendingUpdateMessage(payload = {}) {
 function normalizeToolName(rawText) {
   const text = normalizeText(rawText).toLowerCase();
   if (!text) return null;
-  if (text.includes("notion_search")) return "notion_search";
+  const match = text.match(/\b(notion_search|notion_update)\b/);
+  if (Array.isArray(match) && match[1]) {
+    return match[1];
+  }
   if (text.includes("notion_update")) return "notion_update";
+  if (text.includes("notion_search")) return "notion_search";
   if (/(none|不要|なし|not needed|tool not needed)/.test(text)) return null;
   return null;
 }
@@ -508,7 +512,8 @@ export async function buildToolCallPrompt(userMessage) {
   const template = await loadPromptTemplate("tool_call_prompt.txt");
   const usermessage = normalizeText(userMessage);
   const judgePrompt = `${template}\nユーザー入力:${usermessage}\n判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。返答はnotion_search か notion_update のいずれかの文字列のみで答えてください.`;
-  return generateText(judgePrompt);
+  const rawResult = await generateText(judgePrompt);
+  return normalizeToolName(rawResult);
 }
 
 export async function buildRecallPrompt(userMessage, toolName, toolResult) {
@@ -605,34 +610,40 @@ export async function generateTextWithNotionWorkflow(
         pendingUpdate.schemaProperties || notionUpdateContext.schemaProperties
       );
 
-      toolResult = savedPage?.url
-        ? `Notionページを更新しました: ${savedPage.url}`
-        : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`;
-    } else if (!notionUpdateContext.parentId) {
-      toolResult = "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。";
-    } else {
-      const savePayload = {
-        title: questionText,
-        content: questionText,
+      return {
+        content: savedPage?.url
+          ? `Notionページを更新しました: ${savedPage.url}`
+          : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`,
+        pendingUpdate: null,
       };
-
-      nextPendingUpdate = {
-        parentId: notionUpdateContext.parentId,
-        payload: savePayload,
-        schemaProperties: pendingUpdate?.schemaProperties || notionUpdateContext.schemaProperties,
-      };
-
-      toolResult = buildPendingUpdateMessage(savePayload);
     }
-  } else {
-    toolResult = await executeNotionSearch(accessToken, questionText);
+
+    if (!notionUpdateContext.parentId) {
+      return {
+        content: "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。",
+        pendingUpdate: null,
+      };
+    }
+
+    const savePayload = {
+      title: questionText,
+      content: questionText,
+    };
+
+    nextPendingUpdate = {
+      parentId: notionUpdateContext.parentId,
+      payload: savePayload,
+      schemaProperties: pendingUpdate?.schemaProperties || notionUpdateContext.schemaProperties,
+    };
+
+    return {
+      content: buildPendingUpdateMessage(savePayload),
+      pendingUpdate: nextPendingUpdate,
+    };
   }
 
-  const recallPrompt = await buildRecallPrompt(
-    questionText,
-    toolName,
-    toolResult
-  );
+  toolResult = await executeNotionSearch(accessToken, questionText);
+  const recallPrompt = await buildRecallPrompt(questionText, toolName, toolResult);
 
   return {
     content: await generateText(recallPrompt),

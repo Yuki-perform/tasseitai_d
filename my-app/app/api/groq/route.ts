@@ -9,6 +9,11 @@ function isConfirmationMessage(value: string) {
   return /(はい|ok|okay|実行|実行して|更新して|承認|確認|問題ない|そのまま|進めて|実行してよい|実行していい)/.test(text);
 }
 
+function isCancellationMessage(value: string) {
+  const text = value.trim().toLowerCase();
+  return /(いいえ|やめる|キャンセル|中止|中断|取り消し)/.test(text);
+}
+
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
@@ -48,7 +53,27 @@ export async function POST(request: Request) {
         }
       }
 
-      const confirmed = Boolean(pendingUpdate && isConfirmationMessage(question));
+      const hasPendingUpdate = Boolean(pendingUpdate);
+      const confirmed = hasPendingUpdate && isConfirmationMessage(question);
+      const cancelled = hasPendingUpdate && isCancellationMessage(question);
+
+      if (hasPendingUpdate && !confirmed && !cancelled) {
+        return NextResponse.json({
+          content:
+            "前回の更新内容はまだ確認待ちです。更新する場合は「はい」、キャンセルする場合は「いいえ」と入力してください。",
+        });
+      }
+
+      if (cancelled) {
+        cookieStore.set("notion_pending_update", "", {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 0,
+        });
+        return NextResponse.json({ content: "更新をキャンセルしました。" });
+      }
+
       const workflowResult = await generateTextWithNotionWorkflow(
         question,
         accessToken,
