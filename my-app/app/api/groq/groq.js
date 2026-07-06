@@ -163,7 +163,7 @@ function buildNotionPropertyValue(type, rawValue) {
       const numberValue = Number(rawValue);
       return Number.isFinite(numberValue)
         ? { number: numberValue }
-        : { rich_text: [{ type: "text", text: { content: valueText } }] };
+        : { number: 0 };
     }
     case "checkbox":
       return { checkbox: Boolean(rawValue) };
@@ -175,14 +175,14 @@ function buildNotionPropertyValue(type, rawValue) {
       return { phone_number: valueText || null };
     case "date": {
       const parsed = parseDateValue(rawValue);
-      return parsed
-        ? { date: { start: parsed } }
-        : { rich_text: [{ type: "text", text: { content: valueText } }] };
+      // Notion expects a date object for date properties. If parsing fails,
+      // provide a sensible default (current time) to avoid validation errors.
+      return { date: { start: parsed || new Date().toISOString() } };
     }
     case "select":
       return {
         select: {
-          name: valueText || String(rawValue),
+          name: valueText || String(rawValue) || "Uncategorized",
         },
       };
     case "multi_select": {
@@ -200,6 +200,64 @@ function buildNotionPropertyValue(type, rawValue) {
     default:
       return { rich_text: [{ type: "text", text: { content: valueText } }] };
   }
+}
+
+function ensureRequiredProperties(properties, schemaProperties = {}, payload = {}) {
+  if (!schemaProperties || typeof schemaProperties !== "object") return properties;
+
+  // Normalize schemaProperties: it may be { name: type } or map of prop objects
+  const schemaEntries = Object.entries(schemaProperties).map(([name, val]) => {
+    const type = typeof val === "string" ? val : (val && val.type) || inferNotionPropertyType(name, val);
+    return { name, type };
+  });
+
+  for (const { name, type } of schemaEntries) {
+    // Skip if property already provided
+    if (properties[name]) {
+      // For date property, ensure it has a valid date
+      if (type === "date") {
+        const hasDate = properties[name] && properties[name].date && parseDateValue(properties[name].date.start);
+        if (!hasDate) {
+          properties[name] = { date: { start: new Date().toISOString() } };
+        }
+      }
+      continue;
+    }
+
+    // Provide sensible defaults for required types
+    switch (type) {
+      case "title":
+        properties[name] = createFallbackTitle(payload);
+        break;
+      case "date":
+        properties[name] = { date: { start: new Date().toISOString() } };
+        break;
+      case "number":
+        properties[name] = { number: 0 };
+        break;
+      case "select":
+        properties[name] = { select: { name: "Uncategorized" } };
+        break;
+      case "multi_select":
+        properties[name] = { multi_select: [] };
+        break;
+      case "checkbox":
+        properties[name] = { checkbox: false };
+        break;
+      default:
+        // For rich_text and other types, add minimal text
+        properties[name] = { rich_text: [{ type: "text", text: { content: "" } }] };
+        break;
+    }
+  }
+
+  // Ensure there is at least one title property on the page
+  const hasTitle = Object.values(properties).some((p) => p && p.title);
+  if (!hasTitle) {
+    properties.Title = createFallbackTitle(payload);
+  }
+
+  return properties;
 }
 
 function createFallbackTitle(payload) {
@@ -229,7 +287,8 @@ function buildNotionProperties(payload = {}, schemaProperties = {}) {
     properties.Title = createFallbackTitle(normalizedPayload);
   }
 
-  return properties;
+  // Ensure required properties (dates, titles, numbers, selects, etc.) are present
+  return ensureRequiredProperties(properties, schemaProperties, normalizedPayload);
 }
 
 async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionData = {}) {
@@ -488,6 +547,7 @@ export async function buildToolCallPrompt(userMessage) {
   const judgePrompt = `${template}\nユーザー入力:${usermessage}\n判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。返答はnotion_search か notion_update のいずれかの文字列のみで答えてください.`;
   const rawResult = await generateText(judgePrompt);
   return normalizeToolName(rawResult);
+  console.log("判断結果:", rawResult, "=>", normalizeToolName(rawResult));
 }
 
 export async function buildRecallPrompt(userMessage, toolName, toolResult) {
