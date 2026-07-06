@@ -230,11 +230,11 @@ export function filterNotionPagesByQuery(pages, query) {
   });
 }
 
-async function fetchNotionJson(url, accessToken, body) {
+async function fetchNotionJson(url, accessToken, body, method = "POST") {
   const response = await fetch(url, {
-    method: "POST",
+    method,
     headers: buildHeaders(accessToken),
-    body: JSON.stringify(body),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -245,17 +245,264 @@ async function fetchNotionJson(url, accessToken, body) {
   return response.json();
 }
 
+export async function findChildDatabases(accessToken, pageId, seen = new Set(), depth = 0) {
+  if (!accessToken || !pageId || depth > 2) {
+    return [];
+  }
+
+  const seenSet = seen instanceof Set ? seen : new Set(seen || []);
+
+  try {
+    const data = await fetchNotionJson(
+      `https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`,
+      accessToken,
+      undefined,
+      "GET"
+    );
+
+    const schemas = [];
+    const results = Array.isArray(data?.results) ? data.results : [];
+
+    for (const block of results) {
+      const blockId = block?.id;
+      if (!blockId) continue;
+
+      if (block?.type === "child_database") {
+        if (!seenSet.has(blockId)) {
+          seenSet.add(blockId);
+          const schema = await fetchDbSchema(accessToken, blockId);
+          if (schema) schemas.push(schema);
+        }
+      }
+
+      if (block?.type === "child_page") {
+        const pageKey = `page:${blockId}`;
+        if (!seenSet.has(pageKey)) {
+          seenSet.add(pageKey);
+          const nestedSchemas = await findChildDatabases(accessToken, blockId, seenSet, depth + 1);
+          schemas.push(...nestedSchemas);
+        }
+      }
+    }
+
+    return schemas;
+  } catch (error) {
+    console.warn("[notion] findChildDatabases failed", error);
+    return [];
+  }
+}
+
+export async function fetchDbSchema(accessToken, id) {
+  if (!accessToken || !id) {
+    return null;
+  }
+
+  try {
+    const db = await fetchNotionJson(`https://api.notion.com/v1/databases/${id}`, accessToken, undefined, "GET");
+    const title =
+      Array.isArray(db?.title) && db.title.length > 0
+        ? db.title[0]?.plain_text || db.title[0]?.text?.content || "無題"
+        : "無題";
+
+    const rawProperties = db?.properties && typeof db.properties === "object" ? db.properties : {};
+    const properties = Object.entries(rawProperties).map(([name, prop]) => ({
+      name,
+      type: prop?.type || prop?.config?.type || "unknown",
+    }));
+
+    return {
+      id,
+      title,
+      properties,
+    };
+  } catch (error) {
+    console.warn("[notion] fetchDbSchema failed", error);
+    return null;
+  }
+}
+
+export async function searchDatabases(accessToken) {
+  if (!accessToken) {
+    return [];
+  }
+
+  try {
+    const data = await fetchNotionJson("https://api.notion.com/v1/search", accessToken, { page_size: 100 }, "POST");
+    if (!data || !Array.isArray(data.results)) {
+      console.warn("[notion] searchDatabases returned invalid results");
+      return [];
+    }
+
+    const allDatabases = [];
+    const seenIds = new Set();
+    const dbIdsToTry = new Set();
+    const pageIdsToTraverse = new Set();
+
+    for (const result of data.results) {
+      const objectType = result?.object;
+      const parent = result?.parent;
+      const id = result?.id;
+
+      if (!id) continue;
+
+      if (objectType === "database") {
+        dbIdsToTry.add(id);
+        if (parent?.type === "page_id") {
+          pageIdsToTraverse.add(parent.page_id);
+        }
+        if (parent?.type === "database_id") {
+          dbIdsToTry.add(parent.database_id);
+        }
+      } else if (objectType === "page") {
+        if (parent?.type === "database_id") {
+          dbIdsToTry.add(parent.database_id);
+        } else {
+          pageIdsToTraverse.add(id);
+        }
+
+        if (parent?.type === "page_id") {
+          pageIdsToTraverse.add(parent.page_id);
+        }
+      }
+    }
+
+    for (const dbId of dbIdsToTry) {
+      if (seenIds.has(dbId)) continue;
+      seenIds.add(dbId);
+      const schema = await fetchDbSchema(accessToken, dbId);
+      if (schema) allDatabases.push(schema);
+    }
+
+    for (const pageId of pageIdsToTraverse) {
+      const pageKey = `page:${pageId}`;
+      if (seenIds.has(pageKey)) continue;
+      seenIds.add(pageKey);
+      const nestedSchemas = await findChildDatabases(accessToken, pageId, seenIds);
+      allDatabases.push(...nestedSchemas);
+    }
+
+    return allDatabases;
+  } catch (error) {
+    console.warn("[notion] searchDatabases failed", error);
+    return [];
+  }
+}
+
+export async function fetchPageBodyText(accessToken, pageId) {
+  if (!accessToken || !pageId) {
+    return "";
+  }
+
+  try {
+    const data = await fetchNotionJson(
+      `https://api.notion.com/v1/blocks/${pageId}/children?page_size=10`,
+      accessToken,
+      undefined,
+      "GET"
+    );
+
+    const texts = [];
+    const results = Array.isArray(data?.results) ? data.results : [];
+
+    for (const block of results) {
+      const richText = block?.[block?.type]?.rich_text || [];
+      for (const item of richText) {
+        if (item?.plain_text) {
+          texts.push(item.plain_text);
+        }
+      }
+    }
+
+    return texts.join(" ").slice(0, 500);
+  } catch (error) {
+    console.warn("[notion] fetchPageBodyText failed", error);
+    return "";
+  }
+}
+
+export async function queryDatabase(accessToken, databaseId, includeBody = false) {
+  if (!accessToken || !databaseId) {
+    return [];
+  }
+
+  try {
+    const response = await fetchNotionJson(
+      `https://api.notion.com/v1/databases/${databaseId}/query`,
+      accessToken,
+      { page_size: 50 },
+      "POST"
+    );
+
+    if (!response || !Array.isArray(response.results)) {
+      console.warn("[notion] queryDatabase returned invalid results");
+      return [];
+    }
+
+    const rows = [];
+
+    for (const page of response.results) {
+      const row = { __page_id: page.id };
+      const properties = page.properties || {};
+
+      for (const [key, prop] of Object.entries(properties)) {
+        if (!prop || typeof prop !== "object") continue;
+
+        switch (prop.type) {
+          case "title":
+            row[key] = plainTextFromRichText(prop.title);
+            break;
+          case "rich_text":
+            row[key] = plainTextFromRichText(prop.rich_text);
+            break;
+          case "checkbox":
+            row[key] = prop.checkbox ? "✓" : "✗";
+            break;
+          case "date":
+            row[key] = prop.date?.start ?? "";
+            break;
+          case "select":
+            row[key] = prop.select?.name ?? "";
+            break;
+          case "number":
+            row[key] = prop.number != null ? String(prop.number) : "";
+            break;
+          default:
+            break;
+        }
+      }
+
+      rows.push(row);
+    }
+
+    if (includeBody) {
+      for (const row of rows) {
+        const body = await fetchPageBodyText(accessToken, row.__page_id);
+        if (body) {
+          row.__body = body;
+        }
+      }
+    }
+
+    return rows;
+  } catch (error) {
+    console.warn("[notion] queryDatabase failed", error);
+    return [];
+  }
+}
+
 export async function queryNotionDatabase(
   accessToken,
-  _databaseIdValue,
+  databaseIdValue,
   pageSize = 50,
   maxPages = 5,
   filter = null,
   sorts = null
 ) {
+  void pageSize;
+  void maxPages;
   void filter;
   void sorts;
-  return searchNotionWorkspace(accessToken, "", pageSize, maxPages);
+  return queryDatabase(accessToken, databaseIdValue);
 }
 
 export async function searchNotionWorkspace(accessToken, query = "", pageSize = 50, maxPages = 3) {

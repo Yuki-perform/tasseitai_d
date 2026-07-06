@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getServerSession } from "next-auth/next";
 import { generateText, generateTextWithNotionWorkflow } from "./groq.js";
 import { authOptions } from "../auth/[...nextauth]/route";
@@ -27,7 +28,11 @@ export async function POST(request: Request) {
           { status: 401 }
         );
       }
-      content = await generateTextWithNotionWorkflow(question, accessToken);
+
+      //理想の処理:contentにNotionデータを見たうえでの回答が入る
+      const cookieStore = await cookies();
+      const notionParentId = cookieStore.get("notion_page_id")?.value ?? "";
+      content = await generateTextWithNotionWorkflow(question, accessToken, notionParentId);
       res = typeof content === "string" ? content : "";
     } else if (prompt) {
       content = await generateText(prompt);
