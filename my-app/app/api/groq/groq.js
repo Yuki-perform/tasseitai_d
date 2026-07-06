@@ -254,6 +254,43 @@ function buildNotionProperties(payload = {}, schemaProperties = {}) {
   return properties;
 }
 
+async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionData = {}) {
+  let parentId = typeof requestedParentId === "string" ? requestedParentId : "";
+  const rawProperties = notionData?.results?.[0]?.properties;
+  const schemaProperties = rawProperties && typeof rawProperties === "object" ? rawProperties : {};
+
+  if (!parentId) {
+    const databases = await searchDatabases(accessToken);
+    if (Array.isArray(databases) && databases.length > 0) {
+      parentId = databases[0].id;
+      if (!Object.keys(schemaProperties).length && Array.isArray(databases[0].properties)) {
+        return {
+          parentId,
+          schemaProperties: Object.fromEntries(
+            databases[0].properties.map((prop) => [prop.name, prop.type || "rich_text"])
+          ),
+        };
+      }
+    }
+  }
+
+  if (parentId && !Object.keys(schemaProperties).length) {
+    const rows = await queryDatabase(accessToken, parentId, false);
+    if (Array.isArray(rows) && rows.length > 0) {
+      const inferredProperties = {};
+      for (const [key, value] of Object.entries(rows[0])) {
+        if (key.startsWith("__")) continue;
+        inferredProperties[key] = value;
+      }
+      if (Object.keys(inferredProperties).length > 0) {
+        return { parentId, schemaProperties: inferredProperties };
+      }
+    }
+  }
+
+  return { parentId, schemaProperties };
+}
+
 async function createNotionPage(accessToken, parentId, properties) {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
@@ -545,6 +582,8 @@ export async function generateTextWithNotionWorkflow(
   let nextPendingUpdate = null;
 
   if (toolName === "notion_update") {
+    const notionUpdateContext = await resolveNotionUpdateArgs(accessToken, notionParentId, notionData);
+
     if (confirmed && pendingUpdate) {
       const savePayload = pendingUpdate.payload || {
         title: questionText,
@@ -553,15 +592,15 @@ export async function generateTextWithNotionWorkflow(
 
       const savedPage = await saveToNotion(
         accessToken,
-        pendingUpdate.parentId || notionParentId,
+        pendingUpdate.parentId || notionUpdateContext.parentId,
         savePayload,
-        pendingUpdate.schemaProperties || notionData?.results?.[0]?.properties
+        pendingUpdate.schemaProperties || notionUpdateContext.schemaProperties
       );
 
       toolResult = savedPage?.url
         ? `Notionページを更新しました: ${savedPage.url}`
         : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`;
-    } else if (!notionParentId) {
+    } else if (!notionUpdateContext.parentId) {
       toolResult = "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。";
     } else {
       const savePayload = {
@@ -570,9 +609,9 @@ export async function generateTextWithNotionWorkflow(
       };
 
       nextPendingUpdate = {
-        parentId: notionParentId,
+        parentId: notionUpdateContext.parentId,
         payload: savePayload,
-        schemaProperties: notionData?.results?.[0]?.properties,
+        schemaProperties: pendingUpdate?.schemaProperties || notionUpdateContext.schemaProperties,
       };
 
       toolResult = buildPendingUpdateMessage(savePayload);
