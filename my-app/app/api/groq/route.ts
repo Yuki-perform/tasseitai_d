@@ -4,6 +4,11 @@ import { getServerSession } from "next-auth/next";
 import { generateText, generateTextWithNotionWorkflow } from "./groq.js";
 import { authOptions } from "../auth/[...nextauth]/route";
 
+function isConfirmationMessage(value: string) {
+  const text = value.trim().toLowerCase();
+  return /(はい|ok|okay|実行|実行して|更新して|承認|確認|問題ない|そのまま|進めて|実行してよい|実行していい)/.test(text);
+}
+
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
@@ -32,8 +37,44 @@ export async function POST(request: Request) {
       //理想の処理:contentにNotionデータを見たうえでの回答が入る
       const cookieStore = await cookies();
       const notionParentId = cookieStore.get("notion_page_id")?.value ?? "";
-      content = await generateTextWithNotionWorkflow(question, accessToken, notionParentId);
-      res = typeof content === "string" ? content : "";
+      const pendingCookie = cookieStore.get("notion_pending_update")?.value ?? "";
+      let pendingUpdate: any = null;
+
+      if (pendingCookie) {
+        try {
+          pendingUpdate = JSON.parse(Buffer.from(pendingCookie, "base64url").toString("utf8"));
+        } catch {
+          pendingUpdate = null;
+        }
+      }
+
+      const confirmed = Boolean(pendingUpdate && isConfirmationMessage(question));
+      const workflowResult = await generateTextWithNotionWorkflow(
+        question,
+        accessToken,
+        notionParentId,
+        pendingUpdate,
+        confirmed
+      );
+
+      res = typeof workflowResult === "string" ? workflowResult : workflowResult?.content || "";
+      content = res;
+
+      if (workflowResult && typeof workflowResult === "object" && workflowResult.pendingUpdate) {
+        const pendingValue = Buffer.from(JSON.stringify(workflowResult.pendingUpdate)).toString("base64url");
+        cookieStore.set("notion_pending_update", pendingValue, {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+        });
+      } else {
+        cookieStore.set("notion_pending_update", "", {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 0,
+        });
+      }
     } else if (prompt) {
       content = await generateText(prompt);
       res = typeof content === "string" ? content : "";

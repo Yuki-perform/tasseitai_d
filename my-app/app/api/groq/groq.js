@@ -33,6 +33,32 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isConfirmationMessage(value) {
+  const text = normalizeText(value).toLowerCase();
+  return /(はい|ok|okay|実行|実行して|更新して|承認|確認|問題ない|そのまま|進めて|実行してよい|実行していい)/.test(text);
+}
+
+function isCancellationMessage(value) {
+  const text = normalizeText(value).toLowerCase();
+  return /(いいえ|やめる|キャンセル|中止|中断|取り消し)/.test(text);
+}
+
+function buildPendingUpdateMessage(payload = {}) {
+  const title = normalizeText(payload.title);
+  const content = normalizeText(payload.content);
+  const details = [];
+
+  if (title) details.push(`- タイトル: ${title}`);
+  if (content) details.push(`- 内容: ${content}`);
+
+  return [
+    "更新内容を確認してください。",
+    ...details,
+    "この内容で Notion を更新してよろしいですか？",
+    "「はい」で実行します。",
+  ].join("\n");
+}
+
 function normalizeToolName(rawText) {
   const text = normalizeText(rawText).toLowerCase();
   if (!text) return null;
@@ -482,26 +508,60 @@ export async function generateTextFromNotionData(question, accessToken) {
 
 //引数: question ユーザーからの質問
 //返り値:　notionデータを見たうえでの回答
-export async function generateTextWithNotionWorkflow(question, accessToken, notionParentId = "") {
-  //質問文を成形してquestionTextに格納
+export async function generateTextWithNotionWorkflow(
+  question,
+  accessToken,
+  notionParentId = "",
+  pendingUpdate = null,
+  confirmed = false
+) {
   const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
 
-  //toolNameにはsearchかupdateが入る
-  const toolName = await buildToolCallPrompt(questionText);
+  const notionData = await fetchNotionData(accessToken, questionText);
+  let toolName = null;
 
-  if (!toolName) {
-    return generateText(questionText);
+  if (pendingUpdate && confirmed) {
+    toolName = "notion_update";
+  } else if (pendingUpdate && isCancellationMessage(questionText)) {
+    return {
+      content: "更新をキャンセルしました。",
+      pendingUpdate: null,
+    };
+  } else {
+    toolName = await buildToolCallPrompt(questionText);
   }
 
-  const notionData = await fetchNotionData(accessToken, questionText);
-  let toolResult = "";
+  if (!toolName) {
+    return {
+      content: await generateText(questionText),
+      pendingUpdate: null,
+    };
+  }
 
-  //updateの場合、Notionへ保存する。
+  let toolResult = "";
+  let nextPendingUpdate = null;
+
   if (toolName === "notion_update") {
-    if (!notionParentId) {
+    if (confirmed && pendingUpdate) {
+      const savePayload = pendingUpdate.payload || {
+        title: questionText,
+        content: questionText,
+      };
+
+      const savedPage = await saveToNotion(
+        accessToken,
+        pendingUpdate.parentId || notionParentId,
+        savePayload,
+        pendingUpdate.schemaProperties || notionData?.results?.[0]?.properties
+      );
+
+      toolResult = savedPage?.url
+        ? `Notionページを更新しました: ${savedPage.url}`
+        : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`;
+    } else if (!notionParentId) {
       toolResult = "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。";
     } else {
       const savePayload = {
@@ -509,28 +569,27 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
         content: questionText,
       };
 
-      const savedPage = await saveToNotion(
-        accessToken,
-        notionParentId,
-        savePayload,
-        notionData?.results?.[0]?.properties
-      );
+      nextPendingUpdate = {
+        parentId: notionParentId,
+        payload: savePayload,
+        schemaProperties: notionData?.results?.[0]?.properties,
+      };
 
-      toolResult = savedPage?.url
-        ? `Notionページを作成しました: ${savedPage.url}`
-        : `Notionページを作成しました: ${savedPage?.id || "保存が完了しました"}`;
+      toolResult = buildPendingUpdateMessage(savePayload);
     }
   } else {
     toolResult = await executeNotionSearch(accessToken, questionText);
   }
 
-  //二回目の質問文を作成する。
   const recallPrompt = await buildRecallPrompt(
     questionText,
     toolName,
     toolResult
   );
 
-  return generateText(recallPrompt);
+  return {
+    content: await generateText(recallPrompt),
+    pendingUpdate: nextPendingUpdate,
+  };
 }
 
