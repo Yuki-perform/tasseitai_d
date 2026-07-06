@@ -72,6 +72,37 @@ function parseDateValue(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
+function normalizeSchemaPropertiesInput(schemaProperties) {
+  if (!schemaProperties) return {};
+  // If schema is provided as array of { name, type }
+  if (Array.isArray(schemaProperties)) {
+    try {
+      return Object.fromEntries(
+        schemaProperties
+          .filter((p) => p && typeof p.name === "string")
+          .map((p) => [p.name, p.type || "rich_text"])
+      );
+    } catch {
+      return {};
+    }
+  }
+  // If schema is an object with a `properties` array (the shape the user requested)
+  if (schemaProperties && Array.isArray(schemaProperties.properties)) {
+    try {
+      return Object.fromEntries(
+        schemaProperties.properties
+          .filter((p) => p && typeof p.name === "string")
+          .map((p) => [p.name, p.type || (p && p.type) || "rich_text"])
+      );
+    } catch {
+      return {};
+    }
+  }
+  // If provided as map/object already
+  if (typeof schemaProperties === "object") return schemaProperties;
+  return {};
+}
+
 function inferNotionPropertyType(propertyKey, rawValue) {
   const key = normalizeKey(propertyKey);
   if (!key) return "rich_text";
@@ -94,12 +125,13 @@ function buildNotionSchemaMap(schemaProperties = {}) {
   const exactMatches = new Map();
   const groupedByType = {};
 
-  if (!schemaProperties || typeof schemaProperties !== "object") {
+  const normalized = normalizeSchemaPropertiesInput(schemaProperties);
+  if (!normalized || typeof normalized !== "object") {
     return { exactMatches, groupedByType };
   }
 
-  Object.entries(schemaProperties).forEach(([name, value]) => {
-    const type = inferNotionPropertyType(name, value);
+  Object.entries(normalized).forEach(([name, value]) => {
+    const type = typeof value === "string" ? value : inferNotionPropertyType(name, value);
     const key = normalizeKey(name);
     exactMatches.set(key, { name, type });
     groupedByType[type] = groupedByType[type] || [];
@@ -203,10 +235,10 @@ function buildNotionPropertyValue(type, rawValue) {
 }
 
 function ensureRequiredProperties(properties, schemaProperties = {}, payload = {}) {
-  if (!schemaProperties || typeof schemaProperties !== "object") return properties;
+  const normalized = normalizeSchemaPropertiesInput(schemaProperties);
+  if (!normalized || typeof normalized !== "object") return properties;
 
-  // Normalize schemaProperties: it may be { name: type } or map of prop objects
-  const schemaEntries = Object.entries(schemaProperties).map(([name, val]) => {
+  const schemaEntries = Object.entries(normalized).map(([name, val]) => {
     const type = typeof val === "string" ? val : (val && val.type) || inferNotionPropertyType(name, val);
     return { name, type };
   });
