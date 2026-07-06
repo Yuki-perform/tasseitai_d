@@ -373,38 +373,46 @@ async function fetchNotionData(accessToken, query = "") {
   }
 }
 
-function buildNotionSearchText(rows = [], databaseTitle = "") {
+export function buildNotionSearchText(rows = [], databaseTitle = "") {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "";
   }
 
   return rows
-    .slice(0, 3)
-    .map((row) => {
-      const entries = Object.entries(row)
+    .slice(0, 10)
+    .map((row, index) => {
+      const entries = Object.entries(row || {})
         .filter(([key]) => !key.startsWith("__"))
         .map(([key, value]) => `${key}: ${normalizeNotionTextValue(value)}`)
+        .filter((entry) => entry.split(":").slice(1).join(":").trim())
         .join(" / ");
-      const body = row.__body ? `\nbody: ${normalizeNotionTextValue(row.__body)}` : "";
-      return `- ${databaseTitle ? `${databaseTitle} | ` : ""}${entries}${body}`;
+      const body = row?.__body ? `\nbody: ${normalizeNotionTextValue(row.__body)}` : "";
+      const prefix = databaseTitle ? `${databaseTitle} | ` : "";
+      return `- ${index + 1}. ${prefix}${entries || "内容なし"}${body}`;
     })
     .join("\n");
 }
 
-function matchesNotionQuery(row = {}, question = "") {
+export function matchesNotionQuery(row = {}, question = "") {
   const query = normalizeText(question);
   if (!query) return true;
 
-  const terms = query.split(/\s+/).filter(Boolean);
+  const terms = query
+    .split(/\s+/)
+    .map((term) => term.toLowerCase())
+    .filter(Boolean);
   if (terms.length === 0) return true;
 
-  const haystack = Object.entries(row)
+  const genericQuery = /教えて|内容|一覧|表示|見せ|確認|リスト|何|どんな|どれ|お願い|して/.test(query);
+  if (genericQuery) return true;
+
+  const haystack = Object.entries(row || {})
     .filter(([key]) => !key.startsWith("__"))
     .map(([, value]) => normalizeNotionTextValue(value))
     .join(" ")
     .toLowerCase();
 
-  return terms.every((term) => haystack.includes(term.toLowerCase()));
+  return terms.some((term) => haystack.includes(term));
 }
 
 export async function executeNotionSearch(accessToken, question = "") {
