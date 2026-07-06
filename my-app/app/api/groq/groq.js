@@ -33,32 +33,6 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function isConfirmationMessage(value) {
-  const text = normalizeText(value).toLowerCase();
-  return /(はい|ok|okay|実行|実行して|更新して|承認|確認|問題ない|そのまま|進めて|実行してよい|実行していい)/.test(text);
-}
-
-function isCancellationMessage(value) {
-  const text = normalizeText(value).toLowerCase();
-  return /(いいえ|やめる|キャンセル|中止|中断|取り消し)/.test(text);
-}
-
-function buildPendingUpdateMessage(payload = {}) {
-  const title = normalizeText(payload.title);
-  const content = normalizeText(payload.content);
-  const details = [];
-
-  if (title) details.push(`- タイトル: ${title}`);
-  if (content) details.push(`- 内容: ${content}`);
-
-  return [
-    "更新内容を確認してください。",
-    ...details,
-    "この内容で Notion を更新してよろしいですか？",
-    "「はい」で実行します。",
-  ].join("\n");
-}
-
 function normalizeToolName(rawText) {
   const text = normalizeText(rawText).toLowerCase();
   if (!text) return null;
@@ -558,31 +532,14 @@ export async function generateTextFromNotionData(question, accessToken) {
 
 //引数: question ユーザーからの質問
 //返り値:　notionデータを見たうえでの回答
-export async function generateTextWithNotionWorkflow(
-  question,
-  accessToken,
-  notionParentId = "",
-  pendingUpdate = null,
-  confirmed = false
-) {
+export async function generateTextWithNotionWorkflow(question, accessToken, notionParentId = "") {
   const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
 
   const notionData = await fetchNotionData(accessToken, questionText);
-  let toolName = null;
-
-  if (pendingUpdate && confirmed) {
-    toolName = "notion_update";
-  } else if (pendingUpdate && isCancellationMessage(questionText)) {
-    return {
-      content: "更新をキャンセルしました。",
-      pendingUpdate: null,
-    };
-  } else {
-    toolName = await buildToolCallPrompt(questionText);
-  }
+  const toolName = await buildToolCallPrompt(questionText);
 
   if (!toolName) {
     return {
@@ -591,32 +548,8 @@ export async function generateTextWithNotionWorkflow(
     };
   }
 
-  let toolResult = "";
-  let nextPendingUpdate = null;
-
   if (toolName === "notion_update") {
     const notionUpdateContext = await resolveNotionUpdateArgs(accessToken, notionParentId, notionData);
-
-    if (confirmed && pendingUpdate) {
-      const savePayload = pendingUpdate.payload || {
-        title: questionText,
-        content: questionText,
-      };
-
-      const savedPage = await saveToNotion(
-        accessToken,
-        pendingUpdate.parentId || notionUpdateContext.parentId,
-        savePayload,
-        pendingUpdate.schemaProperties || notionUpdateContext.schemaProperties
-      );
-
-      return {
-        content: savedPage?.url
-          ? `Notionページを更新しました: ${savedPage.url}`
-          : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`,
-        pendingUpdate: null,
-      };
-    }
 
     if (!notionUpdateContext.parentId) {
       return {
@@ -630,24 +563,27 @@ export async function generateTextWithNotionWorkflow(
       content: questionText,
     };
 
-    nextPendingUpdate = {
-      parentId: notionUpdateContext.parentId,
-      payload: savePayload,
-      schemaProperties: pendingUpdate?.schemaProperties || notionUpdateContext.schemaProperties,
-    };
+    const savedPage = await saveToNotion(
+      accessToken,
+      notionUpdateContext.parentId,
+      savePayload,
+      notionUpdateContext.schemaProperties
+    );
 
     return {
-      content: buildPendingUpdateMessage(savePayload),
-      pendingUpdate: nextPendingUpdate,
+      content: savedPage?.url
+        ? `Notionページを更新しました: ${savedPage.url}`
+        : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`,
+      pendingUpdate: null,
     };
   }
 
-  toolResult = await executeNotionSearch(accessToken, questionText);
+  const toolResult = await executeNotionSearch(accessToken, questionText);
   const recallPrompt = await buildRecallPrompt(questionText, toolName, toolResult);
 
   return {
     content: await generateText(recallPrompt),
-    pendingUpdate: nextPendingUpdate,
+    pendingUpdate: null,
   };
 }
 
