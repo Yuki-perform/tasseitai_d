@@ -433,7 +433,8 @@ async function createNotionPage(accessToken, parentId, properties) {
 }
 
 export async function saveToNotion(accessToken, parentId, payload = {}, schemaProperties = {}) {
-  const notionProperties = buildNotionProperties(payload, schemaProperties);
+  const notionProperties = Parameters<typeof notion.pages.create>[0]["properties"];
+  //const notionProperties = buildNotionProperties(payload, schemaProperties);
   return createNotionPage(accessToken, parentId, notionProperties);
 }
 
@@ -692,7 +693,7 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
       : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
 
     //3,更新内容をデータベースに適した形式に当てはめる
-    const savePayload = buildNotionSavePayload(questionText, dbprops);
+    const savePayload = buildNotionSavePayload(questionText, dbprops, dbid, dbtitle);
 
     const savedPage = await saveToNotion(
       accessToken,
