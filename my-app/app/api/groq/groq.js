@@ -13,6 +13,7 @@ import {
   queryDatabase,
   fetchPageBodyText,
   fetchDbSchema,
+  buildNotionSavePayload,
 } from "../notion/notion.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
@@ -434,8 +435,7 @@ async function createNotionPage(accessToken, parentId, properties) {
 }
 
 export async function saveToNotion(accessToken, parentId, payload = {}, schemaProperties = {}) {
-  const notionProperties = Parameters<typeof notion.pages.create>[0]["properties"];
-  //const notionProperties = buildNotionProperties(payload, schemaProperties);
+  const notionProperties = buildNotionProperties(payload, schemaProperties);
   return createNotionPage(accessToken, parentId, notionProperties);
 }
 
@@ -655,6 +655,8 @@ export async function generateTextFromNotionData(question, accessToken) {
   return generateText(promptText);
 }
 
+
+
 //引数: question ユーザーからの質問
 //返り値:　notionデータを見たうえでの回答
 export async function generateTextWithNotionWorkflow(question, accessToken, notionParentId = "") {
@@ -688,23 +690,13 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
     const dbid = dbSchema?.id || notionUpdateContext.parentId;
     const dbtitle = dbSchema?.title || "";
 
-    //2-b,notionに保存
-    try {
-      await notion.pages.create({
-        parent: { database_id: dbid  },
-        properties: notionProperties as Parameters<typeof notion.pages.create>[0]["properties"],
-      })
-    }
-
-
-    /*
     //2,更新するデータベースのpropertiesのnameとtypeを取得
     const dbprops = dbSchema?.properties?.length
       ? dbSchema.properties
       : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
 
     //3,更新内容をデータベースに適した形式に当てはめる
-    const savePayload = buildNotionSavePayload(questionText, dbprops, dbid, dbtitle);
+    const savePayload = buildNotionSavePayload(questionText, dbprops);
 
     const savedPage = await saveToNotion(
       accessToken,
@@ -712,8 +704,6 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
       savePayload,
       notionUpdateContext.schemaProperties
     );
-
-    */
 
     return {
       content: savedPage?.url
