@@ -396,12 +396,14 @@ function buildNotionProperties(
 
 interface NotionUpdateContext {
   parentId: string;
+  parentTitle?: string;
   schemaProperties: Record<string, unknown>;
 }
 
 async function resolveNotionUpdateArgs(
   accessToken: string,
   requestedParentId: string,
+  parentTitle?: string,
   notionData: Record<string, unknown> = {}
 ): Promise<NotionUpdateContext> {
   let parentId = typeof requestedParentId === "string" ? requestedParentId : "";
@@ -461,6 +463,7 @@ function normalizeSchemaPropertiesArray(
 async function createNotionPage(
   accessToken: string,
   parentId: string,
+  parentTitle: string | undefined,
   properties: Record<string, unknown>
 ): Promise<any> {
   if (!accessToken) {
@@ -468,6 +471,9 @@ async function createNotionPage(
   }
   if (!parentId) {
     throw new Error("parentId が必要です");
+  }
+  if (!parentTitle) {
+    throw new Error("parentTitle が必要です");
   }
 
   const headers = {
@@ -494,7 +500,7 @@ async function createNotionPage(
   }
 
   try {
-    const requestBody = { parent: { database_id: parentId }, properties };
+    const requestBody = { parent: { database_id: parentId , title: parentTitle}, properties };
     lastNotionDebugState = {
       requestBody,
       error: null,
@@ -515,7 +521,7 @@ async function createNotionPage(
 
     lastNotionDebugState = {
       requestBody: {
-        parent: { database_id: parentId },
+        parent: { database_id: parentId, title: parentTitle },
         properties,
       },
       error: errorDetails,
@@ -538,11 +544,12 @@ async function createNotionPage(
 export async function saveToNotion(
   accessToken: string,
   parentId: string,
+  parentTitle: string | undefined,
   payload: Record<string, unknown> = {},
   schemaProperties: Record<string, unknown> = {}
 ): Promise<any> {
   const notionProperties = buildNotionProperties(payload, schemaProperties);
-  return createNotionPage(accessToken, parentId, notionProperties);
+  return createNotionPage(accessToken, parentId, parentTitle, notionProperties);
 }
 
 // Notionデータを取得する関数（遅延実行）
@@ -782,7 +789,8 @@ interface GenerateTextWithNotionWorkflowResult {
 export async function generateTextWithNotionWorkflow(
   question: string,
   accessToken: string,
-  notionParentId = ""
+  notionParentId = "",
+  notionParentTitle = ""
 ): Promise<GenerateTextWithNotionWorkflowResult> {
   const questionText = normalizeText(question);
   if (!questionText) {
@@ -803,6 +811,7 @@ export async function generateTextWithNotionWorkflow(
     const notionUpdateContext = await resolveNotionUpdateArgs(
       accessToken,
       notionParentId,
+      notionParentTitle,
       notionData
     );
 
@@ -823,6 +832,7 @@ export async function generateTextWithNotionWorkflow(
     const savedPage = await saveToNotion(
       accessToken,
       notionUpdateContext.parentId,
+      notionUpdateContext.parentTitle,
       savePayload,
       notionUpdateContext.schemaProperties
     );
