@@ -379,20 +379,6 @@ function normalizeSchemaPropertiesArray(schemaProperties = {}) {
   return [];
 }
 
-function buildNotionSavePayload(questionText, schemaProperties = {}) {
-  const payload = {
-    title: questionText,
-    name: questionText,
-    content: questionText,
-    description: questionText,
-    body: questionText,
-    note: questionText,
-    summary: questionText,
-  };
-
-  return buildNotionProperties(payload, schemaProperties);
-}
-
 async function createNotionPage(accessToken, parentId, properties) {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
