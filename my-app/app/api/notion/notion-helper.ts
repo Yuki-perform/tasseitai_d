@@ -286,4 +286,4 @@ export function buildNotionSavePayload(questionText: string, schemaProperties: u
   return buildNotionProperties(payload, schemaProperties);
 }
 
-export { collectNotionPageInfo, searchNotionPages } from "./notion.js";
+export { collectNotionPageInfo, searchNotionPages } from "./notion";

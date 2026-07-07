@@ -1,6 +1,6 @@
 // 使い方：このファイルから必要な関数をインポートして使用します。
 // 例：
-// import { getSavedNotionTestData, searchNotionPages } from "./notion.js";
+// import { getSavedNotionTestData, searchNotionPages } from "./notion.ts";
 //
 // getSavedNotionTestData() - テスト用の保存済みNotionデータを取得します。
 // searchNotionPages(apiKey, query) - Notionワークスペース内のページ／データベースを検索します。
@@ -8,7 +8,7 @@
 
 const defaultNotionVersion = "2022-06-28";
 
-function buildHeaders(accessToken) {
+function buildHeaders(accessToken: string): Record<string, string> {
   if (!accessToken) {
     throw new Error("accessToken is required for Notion API authentication");
   }
@@ -19,12 +19,17 @@ function buildHeaders(accessToken) {
   };
 }
 
-function plainTextFromRichText(items) {
-  if (!Array.isArray(items)) return "";
-  return items.map((item) => item?.plain_text || "").join("");
+interface RichTextItem {
+  plain_text?: string;
+  [key: string]: any;
 }
 
-function simplifyPropertyValue(property) {
+function plainTextFromRichText(items: unknown): string {
+  if (!Array.isArray(items)) return "";
+  return (items as RichTextItem[]).map((item) => item?.plain_text || "").join("");
+}
+
+function simplifyPropertyValue(property: any): any {
   if (!property || typeof property !== "object") return null;
 
   switch (property.type) {
@@ -44,28 +49,44 @@ function simplifyPropertyValue(property) {
       return property.select ? property.select.name : null;
     case "multi_select":
       return Array.isArray(property.multi_select)
-        ? property.multi_select.map((item) => item.name)
+        ? property.multi_select.map((item: any) => item.name)
         : [];
     case "date":
       return property.date || null;
     case "people":
       return Array.isArray(property.people)
-        ? property.people.map((person) => person?.name || person?.email || null).filter(Boolean)
+        ? property.people
+            .map((person: any) => person?.name || person?.email || null)
+            .filter(Boolean)
         : [];
     case "files":
       return Array.isArray(property.files)
-        ? property.files.map((file) => file.name || file.file?.url || file.external?.url)
+        ? property.files.map(
+            (file: any) => file.name || file.file?.url || file.external?.url
+          )
         : [];
     case "relation":
       return Array.isArray(property.relation)
-        ? property.relation.map((relation) => relation.id)
+        ? property.relation.map((relation: any) => relation.id)
         : [];
     case "formula":
       if (!property.formula) return null;
-      return property.formula.string ?? property.formula.number ?? property.formula.boolean ?? property.formula.date ?? null;
+      return (
+        property.formula.string ??
+        property.formula.number ??
+        property.formula.boolean ??
+        property.formula.date ??
+        null
+      );
     case "rollup":
       if (!property.rollup) return null;
-      return property.rollup.array ?? property.rollup.number ?? property.rollup.string ?? property.rollup.date ?? null;
+      return (
+        property.rollup.array ??
+        property.rollup.number ??
+        property.rollup.string ??
+        property.rollup.date ??
+        null
+      );
     case "created_by":
     case "last_edited_by":
       return property[property.type]?.name || property[property.type]?.email || null;
@@ -74,15 +95,15 @@ function simplifyPropertyValue(property) {
   }
 }
 
-export function extractNotionProperties(properties = {}) {
+export function extractNotionProperties(properties: Record<string, any> = {}): Record<string, any> {
   if (!properties || typeof properties !== "object") return {};
-  return Object.entries(properties).reduce((acc, [name, property]) => {
+  return Object.entries(properties).reduce((acc: Record<string, any>, [name, property]) => {
     acc[name] = simplifyPropertyValue(property);
     return acc;
   }, {});
 }
 
-function formatNotionPropertyValue(value) {
+function formatNotionPropertyValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return String(value);
@@ -102,22 +123,37 @@ function formatNotionPropertyValue(value) {
   return String(value);
 }
 
-export function formatNotionPropertiesList(properties = {}) {
+export function formatNotionPropertiesList(properties: Record<string, any> = {}): string[] {
   const simplified = extractNotionProperties(properties);
   return Object.entries(simplified).map(([name, value]) => `${name}: ${formatNotionPropertyValue(value)}`);
 }
 
-function parseInput(argv, name, envName) {
+interface ParseInputOptions {
+  argv?: string[];
+  env?: Record<string, string | undefined>;
+}
+
+function parseInput(argv: string[], name: string, envName: string): string | undefined {
   const prefix = `${name}=`;
   const arg = argv.find((value) => value.startsWith(prefix));
   if (arg) {
     return arg.slice(prefix.length);
   }
-  return process.env[envName] || undefined;
+  return process.env[envName];
 }
 
-export function getNotionFetchOptions(argv = process.argv, env = process.env) {
-  void env;
+interface NotionFetchOptions {
+  accessToken?: string;
+  query: string;
+  searchType: "search" | "workspace";
+  pageSize: number;
+  maxPages: number;
+}
+
+export function getNotionFetchOptions(
+  argv = process.argv,
+  env = process.env as Record<string, string | undefined>
+): NotionFetchOptions {
   const accessToken = parseInput(argv, "accessToken", "NOTION_ACCESS_TOKEN");
   const query = parseInput(argv, "query", "NOTION_QUERY") || "";
   const searchType = parseInput(argv, "searchType", "NOTION_SEARCH_TYPE") === "search" ? "search" : "workspace";
@@ -133,7 +169,13 @@ export function getNotionFetchOptions(argv = process.argv, env = process.env) {
   };
 }
 
-export async function getNotionPagesOutput(options = {}) {
+interface NotionPagesOutput {
+  source: string;
+  count: number;
+  results: any[];
+}
+
+export async function getNotionPagesOutput(options: Partial<NotionFetchOptions> = {}): Promise<NotionPagesOutput> {
   const {
     accessToken,
     query = "",
@@ -143,17 +185,22 @@ export async function getNotionPagesOutput(options = {}) {
   } = options;
 
   const formatted = await fetchNotionPages({
-    accessToken,
+    accessToken: accessToken || "",
     query,
-    searchType,
+    searchType: searchType as "workspace" | "search",
     pageSize,
     maxPages,
   });
 
   return formatted;
 }
-export { buildNotionSavePayload } from "./notion-helper.ts";
-export async function runNotionFetchTest(argv = process.argv, env = process.env) {
+
+export { buildNotionSavePayload } from "./notion-helper";
+
+export async function runNotionFetchTest(
+  argv = process.argv,
+  env = process.env as Record<string, string | undefined>
+): Promise<NotionPagesOutput> {
   const options = getNotionFetchOptions(argv, env);
   if (!options.accessToken) {
     throw new Error("accessToken が必要です。例: node test.js accessToken=your-token");
@@ -164,8 +211,8 @@ export async function runNotionFetchTest(argv = process.argv, env = process.env)
   return result;
 }
 
-export function getSavedNotionTestData() {
-  const savedNotionProperties = {
+export function getSavedNotionTestData(): string[] {
+  const savedNotionProperties: Record<string, any> = {
     Name: { type: "title", title: [{ plain_text: "テストタスク" }] },
     Description: { type: "rich_text", rich_text: [{ plain_text: "これは参照用のNotionデータです。" }] },
     Status: { type: "select", select: { name: "In progress" } },
@@ -175,12 +222,12 @@ export function getSavedNotionTestData() {
   return formatNotionPropertiesList(savedNotionProperties);
 }
 
-export function extractNotionTitle(page) {
+export function extractNotionTitle(page: any): string {
   const titleProperty = Object.values(page.properties || {}).find(
-    (property) => property?.type === "title"
+    (property: any) => property?.type === "title"
   );
   if (titleProperty) {
-    return plainTextFromRichText(titleProperty.title);
+    return plainTextFromRichText((titleProperty as any).title);
   }
 
   if (Array.isArray(page.title)) {
@@ -190,7 +237,21 @@ export function extractNotionTitle(page) {
   return page.url || page.id || "";
 }
 
-export function collectNotionPageInfo(page) {
+interface NotionPageInfo {
+  id: string;
+  object: any;
+  url: string | null;
+  title: string;
+  parent: any;
+  created_time: string | null;
+  last_edited_time: string | null;
+  icon: any;
+  cover: any;
+  properties: Record<string, any>;
+  propertiesList: string[];
+}
+
+export function collectNotionPageInfo(page: any): NotionPageInfo {
   return {
     id: page.id,
     object: page.object ?? null,
@@ -206,7 +267,7 @@ export function collectNotionPageInfo(page) {
   };
 }
 
-export function filterNotionPagesByQuery(pages, query) {
+export function filterNotionPagesByQuery(pages: any[], query?: string): any[] {
   const lowerQuery = (query || "").toLowerCase();
   if (!lowerQuery) return pages;
 
@@ -230,7 +291,12 @@ export function filterNotionPagesByQuery(pages, query) {
   });
 }
 
-async function fetchNotionJson(url, accessToken, body, method = "POST") {
+async function fetchNotionJson(
+  url: string,
+  accessToken: string,
+  body?: Record<string, any>,
+  method = "POST"
+): Promise<any> {
   const response = await fetch(url, {
     method,
     headers: buildHeaders(accessToken),
@@ -245,12 +311,28 @@ async function fetchNotionJson(url, accessToken, body, method = "POST") {
   return response.json();
 }
 
-export async function findChildDatabases(accessToken, pageId, seen = new Set(), depth = 0) {
+interface DbSchemaProperty {
+  name: string;
+  type: string;
+}
+
+interface DbSchema {
+  id: string;
+  title: string;
+  properties: DbSchemaProperty[];
+}
+
+export async function findChildDatabases(
+  accessToken: string,
+  pageId: string,
+  seen?: Set<string>,
+  depth = 0
+): Promise<DbSchema[]> {
   if (!accessToken || !pageId || depth > 2) {
     return [];
   }
 
-  const seenSet = seen instanceof Set ? seen : new Set(seen || []);
+  const seenSet = seen instanceof Set ? seen : new Set<string>(seen || []);
 
   try {
     const data = await fetchNotionJson(
@@ -260,7 +342,7 @@ export async function findChildDatabases(accessToken, pageId, seen = new Set(), 
       "GET"
     );
 
-    const schemas = [];
+    const schemas: DbSchema[] = [];
     const results = Array.isArray(data?.results) ? data.results : [];
 
     for (const block of results) {
@@ -292,20 +374,25 @@ export async function findChildDatabases(accessToken, pageId, seen = new Set(), 
   }
 }
 
-export async function fetchDbSchema(accessToken, id) {
+export async function fetchDbSchema(accessToken: string, id: string): Promise<DbSchema | null> {
   if (!accessToken || !id) {
     return null;
   }
 
   try {
-    const db = await fetchNotionJson(`https://api.notion.com/v1/databases/${id}`, accessToken, undefined, "GET");
+    const db = await fetchNotionJson(
+      `https://api.notion.com/v1/databases/${id}`,
+      accessToken,
+      undefined,
+      "GET"
+    );
     const title =
       Array.isArray(db?.title) && db.title.length > 0
         ? db.title[0]?.plain_text || db.title[0]?.text?.content || "無題"
         : "無題";
 
     const rawProperties = db?.properties && typeof db.properties === "object" ? db.properties : {};
-    const properties = Object.entries(rawProperties).map(([name, prop]) => ({
+    const properties: DbSchemaProperty[] = Object.entries(rawProperties).map(([name, prop]: [string, any]) => ({
       name,
       type: prop?.type || prop?.config?.type || "unknown",
     }));
@@ -321,22 +408,27 @@ export async function fetchDbSchema(accessToken, id) {
   }
 }
 
-export async function searchDatabases(accessToken) {
+export async function searchDatabases(accessToken: string): Promise<DbSchema[]> {
   if (!accessToken) {
     return [];
   }
 
   try {
-    const data = await fetchNotionJson("https://api.notion.com/v1/search", accessToken, { page_size: 100 }, "POST");
+    const data = await fetchNotionJson(
+      "https://api.notion.com/v1/search",
+      accessToken,
+      { page_size: 100 },
+      "POST"
+    );
     if (!data || !Array.isArray(data.results)) {
       console.warn("[notion] searchDatabases returned invalid results");
       return [];
     }
 
-    const allDatabases = [];
-    const seenIds = new Set();
-    const dbIdsToTry = new Set();
-    const pageIdsToTraverse = new Set();
+    const allDatabases: DbSchema[] = [];
+    const seenIds = new Set<string>();
+    const dbIdsToTry = new Set<string>();
+    const pageIdsToTraverse = new Set<string>();
 
     for (const result of data.results) {
       const objectType = result?.object;
@@ -388,7 +480,7 @@ export async function searchDatabases(accessToken) {
   }
 }
 
-export async function fetchPageBodyText(accessToken, pageId) {
+export async function fetchPageBodyText(accessToken: string, pageId: string): Promise<string> {
   if (!accessToken || !pageId) {
     return "";
   }
@@ -401,7 +493,7 @@ export async function fetchPageBodyText(accessToken, pageId) {
       "GET"
     );
 
-    const texts = [];
+    const texts: string[] = [];
     const results = Array.isArray(data?.results) ? data.results : [];
 
     for (const block of results) {
@@ -420,7 +512,17 @@ export async function fetchPageBodyText(accessToken, pageId) {
   }
 }
 
-export async function queryDatabase(accessToken, databaseId, includeBody = false) {
+interface NotionQueryRow {
+  __page_id: string;
+  __body?: string;
+  [key: string]: any;
+}
+
+export async function queryDatabase(
+  accessToken: string,
+  databaseId: string,
+  includeBody = false
+): Promise<NotionQueryRow[]> {
   if (!accessToken || !databaseId) {
     return [];
   }
@@ -438,33 +540,34 @@ export async function queryDatabase(accessToken, databaseId, includeBody = false
       return [];
     }
 
-    const rows = [];
+    const rows: NotionQueryRow[] = [];
 
     for (const page of response.results) {
-      const row = { __page_id: page.id };
+      const row: NotionQueryRow = { __page_id: page.id };
       const properties = page.properties || {};
 
       for (const [key, prop] of Object.entries(properties)) {
         if (!prop || typeof prop !== "object") continue;
 
-        switch (prop.type) {
+        const propAny = prop as any;
+        switch (propAny.type) {
           case "title":
-            row[key] = plainTextFromRichText(prop.title);
+            row[key] = plainTextFromRichText(propAny.title);
             break;
           case "rich_text":
-            row[key] = plainTextFromRichText(prop.rich_text);
+            row[key] = plainTextFromRichText(propAny.rich_text);
             break;
           case "checkbox":
-            row[key] = prop.checkbox ? "✓" : "✗";
+            row[key] = propAny.checkbox ? "✓" : "✗";
             break;
           case "date":
-            row[key] = prop.date?.start ?? "";
+            row[key] = propAny.date?.start ?? "";
             break;
           case "select":
-            row[key] = prop.select?.name ?? "";
+            row[key] = propAny.select?.name ?? "";
             break;
           case "number":
-            row[key] = prop.number != null ? String(prop.number) : "";
+            row[key] = propAny.number != null ? String(propAny.number) : "";
             break;
           default:
             break;
@@ -491,29 +594,30 @@ export async function queryDatabase(accessToken, databaseId, includeBody = false
 }
 
 export async function queryNotionDatabase(
-  accessToken,
-  databaseIdValue,
+  accessToken: string,
+  databaseIdValue: string,
   pageSize = 50,
   maxPages = 5,
-  filter = null,
-  sorts = null
-) {
-  void pageSize;
-  void maxPages;
-  void filter;
-  void sorts;
+  filter: any = null,
+  sorts: any = null
+): Promise<NotionQueryRow[]> {
   return queryDatabase(accessToken, databaseIdValue);
 }
 
-export async function searchNotionWorkspace(accessToken, query = "", pageSize = 50, maxPages = 3) {
-  const results = [];
-  let nextCursor = null;
+export async function searchNotionWorkspace(
+  accessToken: string,
+  query = "",
+  pageSize = 50,
+  maxPages = 3
+): Promise<any[]> {
+  const results: any[] = [];
+  let nextCursor: string | null = null;
   const safePageSize = Math.min(Math.max(pageSize, 1), 100);
   const safeMaxPages = Math.min(Math.max(maxPages, 1), 10);
   let requestCount = 0;
 
   do {
-    const body = {
+    const body: Record<string, any> = {
       query,
       page_size: safePageSize,
     };
@@ -531,8 +635,27 @@ export async function searchNotionWorkspace(accessToken, query = "", pageSize = 
   return results;
 }
 
-export async function searchNotionPages(accessToken, query = "", pageSize = 50, maxPages = 3) {
+export async function searchNotionPages(
+  accessToken: string,
+  query = "",
+  pageSize = 50,
+  maxPages = 3
+): Promise<any[]> {
   return searchNotionWorkspace(accessToken, query, pageSize, maxPages);
+}
+
+interface FetchNotionPagesOptions {
+  accessToken: string;
+  query?: string;
+  searchType?: "workspace" | "search";
+  pageSize?: number;
+  maxPages?: number;
+}
+
+interface FetchNotionPagesResult {
+  source: string;
+  count: number;
+  results: NotionPageInfo[];
 }
 
 export async function fetchNotionPages({
@@ -541,7 +664,7 @@ export async function fetchNotionPages({
   searchType = "workspace",
   pageSize = 50,
   maxPages = 3,
-}) {
+}: FetchNotionPagesOptions): Promise<FetchNotionPagesResult> {
   if (!accessToken) {
     throw new Error("accessToken is required to fetch Notion pages.");
   }
@@ -556,5 +679,3 @@ export async function fetchNotionPages({
     results,
   };
 }
-
-

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { collectNotionPageInfo, searchNotionPages } from "./notion.js";
+import { collectNotionPageInfo, searchNotionPages } from "./notion";
 import { authOptions } from "../auth/[...nextauth]/route";
 
 const defaultPageSize = 50;

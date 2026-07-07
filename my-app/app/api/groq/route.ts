@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getServerSession } from "next-auth/next";
-import { generateText, generateTextWithNotionWorkflow } from "./groq.js";
+import { generateText, generateTextWithNotionWorkflow } from "./groq";
 import { authOptions } from "../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";

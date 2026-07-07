@@ -1,9 +1,3 @@
-// 使い方：呼び出したいファイルで、
-// import { generateText } from "./groq.js";　を追加してください。
-// その後、generateText関数を呼び出すだけです。
-//
-// 例：test.js での呼び出し例があります。参考にしてください。
-
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,39 +8,39 @@ import {
   fetchPageBodyText,
   fetchDbSchema,
   buildNotionSavePayload,
-} from "../notion/notion.js";
+} from "../notion/notion";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
-async function loadPromptTemplate(fileName) {
+async function loadPromptTemplate(fileName: string): Promise<string> {
   const candidatePaths = [
     path.join(currentDir, fileName),
     path.join(currentDir, "..", "notion", fileName),
     path.join(currentDir, "..", "groq", fileName),
   ];
 
-  let lastError;
+  let lastError: Error | undefined;
   for (const candidatePath of candidatePaths) {
     try {
       return await readFile(candidatePath, "utf8");
     } catch (error) {
-      lastError = error;
+      lastError = error as Error;
     }
   }
 
   throw lastError ?? new Error(`Prompt template not found: ${fileName}`);
 }
 
-function normalizeText(value) {
+function normalizeText(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeToolName(rawText) {
+function normalizeToolName(rawText: unknown): "notion_search" | "notion_update" | null {
   const text = normalizeText(rawText).toLowerCase();
   if (!text) return null;
   const match = text.match(/\b(notion_search|notion_update)\b/);
   if (Array.isArray(match) && match[1]) {
-    return match[1];
+    return match[1] as "notion_search" | "notion_update";
   }
   if (text.includes("notion_update")) return "notion_update";
   if (text.includes("notion_search")) return "notion_search";
@@ -54,14 +48,14 @@ function normalizeToolName(rawText) {
   return null;
 }
 
-function normalizeKey(value) {
+function normalizeKey(value: unknown): string {
   return normalizeText(value)
     .replace(/[_\s-]+/g, " ")
     .trim()
     .toLowerCase();
 }
 
-function safeParseJson(value) {
+function safeParseJson(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
     return JSON.parse(value);
@@ -70,7 +64,7 @@ function safeParseJson(value) {
   }
 }
 
-function parseDateValue(value) {
+function parseDateValue(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString();
   }
@@ -80,7 +74,9 @@ function parseDateValue(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
-function normalizeSchemaPropertiesInput(schemaProperties) {
+function normalizeSchemaPropertiesInput(
+  schemaProperties: unknown
+): Record<string, string> {
   if (!schemaProperties) return {};
   // If schema is provided as array of { name, type }
   if (Array.isArray(schemaProperties)) {
@@ -95,43 +91,71 @@ function normalizeSchemaPropertiesInput(schemaProperties) {
     }
   }
   // If schema is an object with a `properties` array (the shape the user requested)
-  if (schemaProperties && Array.isArray(schemaProperties.properties)) {
+  if (
+    schemaProperties &&
+    typeof schemaProperties === "object" &&
+    Array.isArray((schemaProperties as any).properties)
+  ) {
     try {
       return Object.fromEntries(
-        schemaProperties.properties
-          .filter((p) => p && typeof p.name === "string")
-          .map((p) => [p.name, p.type || (p && p.type) || "rich_text"])
+        (schemaProperties as any).properties
+          .filter((p: any) => p && typeof p.name === "string")
+          .map((p: any) => [p.name, p.type || (p && p.type) || "rich_text"])
       );
     } catch {
       return {};
     }
   }
   // If provided as map/object already
-  if (typeof schemaProperties === "object") return schemaProperties;
+  if (typeof schemaProperties === "object") return schemaProperties as Record<string, string>;
   return {};
 }
 
-function inferNotionPropertyType(propertyKey, rawValue) {
+function inferNotionPropertyType(propertyKey: string, rawValue: unknown): string {
   const key = normalizeKey(propertyKey);
   if (!key) return "rich_text";
 
   if (/(^title$|^name$|subject|headline|heading)/.test(key)) return "title";
-  if (/(description|content|body|note|memo|summary|detail|comment|message|sentence|prompt|question)/.test(key)) return "rich_text";
-  if (/(status|state|stage|type|category|priority|label|role|topic|level)/.test(key)) return "select";
-  if (/(tags|labels|categories|genres|topics|people|assignees)/.test(key)) return "multi_select";
-  if (/(date|due|deadline|created|updated|finished|time|start|end)/.test(key)) return "date";
+  if (
+    /(description|content|body|note|memo|summary|detail|comment|message|sentence|prompt|question)/.test(
+      key
+    )
+  )
+    return "rich_text";
+  if (/(status|state|stage|type|category|priority|label|role|topic|level)/.test(key))
+    return "select";
+  if (/(tags|labels|categories|genres|topics|people|assignees)/.test(key))
+    return "multi_select";
+  if (/(date|due|deadline|created|updated|finished|time|start|end)/.test(key))
+    return "date";
   if (/(url|link|website|homepage|page|path)/.test(key)) return "url";
   if (/(email|mail)/.test(key)) return "email";
   if (/(phone|tel|mobile|contact)/.test(key)) return "phone_number";
-  if (/(^(is|has|should|was|can|did|do|done)|_(is|has|done)$|checkbox|completed|active|enabled)/.test(key) || typeof rawValue === "boolean") return "checkbox";
+  if (
+    /(^(is|has|should|was|can|did|do|done)|_(is|has|done)$|checkbox|completed|active|enabled)/.test(
+      key
+    ) ||
+    typeof rawValue === "boolean"
+  )
+    return "checkbox";
   if (Array.isArray(rawValue)) return "multi_select";
   if (typeof rawValue === "number") return "number";
   return "rich_text";
 }
 
-function buildNotionSchemaMap(schemaProperties = {}) {
-  const exactMatches = new Map();
-  const groupedByType = {};
+interface SchemaMapItem {
+  name: string;
+  type: string;
+}
+
+interface SchemaMap {
+  exactMatches: Map<string, SchemaMapItem>;
+  groupedByType: Record<string, SchemaMapItem[]>;
+}
+
+function buildNotionSchemaMap(schemaProperties: Record<string, unknown> = {}): SchemaMap {
+  const exactMatches = new Map<string, SchemaMapItem>();
+  const groupedByType: Record<string, SchemaMapItem[]> = {};
 
   const normalized = normalizeSchemaPropertiesInput(schemaProperties);
   if (!normalized || typeof normalized !== "object") {
@@ -149,7 +173,11 @@ function buildNotionSchemaMap(schemaProperties = {}) {
   return { exactMatches, groupedByType };
 }
 
-function lookupNotionProperty(rawKey, schemaMap, rawValue) {
+function lookupNotionProperty(
+  rawKey: string,
+  schemaMap: SchemaMap,
+  rawValue: unknown
+): SchemaMapItem {
   const normalizedKey = normalizeKey(rawKey);
   const exact = schemaMap.exactMatches.get(normalizedKey);
   if (exact) return exact;
@@ -163,7 +191,7 @@ function lookupNotionProperty(rawKey, schemaMap, rawValue) {
   return { name: String(rawKey).trim() || "Title", type: inferredType };
 }
 
-function normalizeNotionTextValue(value) {
+function normalizeNotionTextValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -179,7 +207,7 @@ function normalizeNotionTextValue(value) {
   return String(value).trim();
 }
 
-function buildTitleProperty(content) {
+function buildTitleProperty(content: string): Record<string, unknown> {
   return {
     title: [
       {
@@ -191,7 +219,7 @@ function buildTitleProperty(content) {
   };
 }
 
-function buildNotionPropertyValue(type, rawValue) {
+function buildNotionPropertyValue(type: string, rawValue: unknown): Record<string, unknown> | null {
   const valueText = normalizeNotionTextValue(rawValue);
 
   switch (type) {
@@ -229,8 +257,8 @@ function buildNotionPropertyValue(type, rawValue) {
       const items = Array.isArray(rawValue)
         ? rawValue
         : typeof rawValue === "string"
-        ? rawValue.split(/[,;]+/)
-        : [rawValue];
+          ? rawValue.split(/[,;]+/)
+          : [rawValue];
       return {
         multi_select: items
           .map((item) => ({ name: normalizeNotionTextValue(item) }))
@@ -242,12 +270,20 @@ function buildNotionPropertyValue(type, rawValue) {
   }
 }
 
-function ensureRequiredProperties(properties, schemaProperties = {}, payload = {}) {
+function ensureRequiredProperties(
+  properties: Record<string, unknown>,
+  schemaProperties: Record<string, unknown> = {},
+  payload: Record<string, unknown> = {}
+): Record<string, unknown> {
   const normalized = normalizeSchemaPropertiesInput(schemaProperties);
   if (!normalized || typeof normalized !== "object") return properties;
 
   const schemaEntries = Object.entries(normalized).map(([name, val]) => {
-    const type = typeof val === "string" ? val : (val && val.type) || inferNotionPropertyType(name, val);
+    const type =
+      typeof val === "string"
+        ? val
+        : (val && typeof val === "object" && (val as any).type) ||
+          inferNotionPropertyType(name, val);
     return { name, type };
   });
 
@@ -256,7 +292,11 @@ function ensureRequiredProperties(properties, schemaProperties = {}, payload = {
     if (properties[name]) {
       // For date property, ensure it has a valid date
       if (type === "date") {
-        const hasDate = properties[name] && properties[name].date && parseDateValue(properties[name].date.start);
+        const hasDate =
+          properties[name] &&
+          typeof properties[name] === "object" &&
+          (properties[name] as any).date &&
+          parseDateValue((properties[name] as any).date.start);
         if (!hasDate) {
           properties[name] = { date: { start: new Date().toISOString() } };
         }
@@ -292,7 +332,7 @@ function ensureRequiredProperties(properties, schemaProperties = {}, payload = {
   }
 
   // Ensure there is at least one title property on the page
-  const hasTitle = Object.values(properties).some((p) => p && p.title);
+  const hasTitle = Object.values(properties).some((p) => p && typeof p === "object" && (p as any).title);
   if (!hasTitle) {
     properties.Title = createFallbackTitle(payload);
   }
@@ -300,18 +340,22 @@ function ensureRequiredProperties(properties, schemaProperties = {}, payload = {
   return properties;
 }
 
-function createFallbackTitle(payload) {
+function createFallbackTitle(payload: unknown): Record<string, unknown> {
   const values = Array.isArray(payload)
     ? payload.map(normalizeNotionTextValue)
-    : Object.values(payload).map(normalizeNotionTextValue);
+    : Object.values(payload || {}).map(normalizeNotionTextValue);
   const titleText = values.filter(Boolean).join(" / ").trim();
   return buildTitleProperty(titleText || "Notion update");
 }
 
-function buildNotionProperties(payload = {}, schemaProperties = {}) {
-  const normalizedPayload = typeof payload === "string" ? safeParseJson(payload) || { content: payload } : payload || {};
+function buildNotionProperties(
+  payload: Record<string, unknown> | string | null = {},
+  schemaProperties: Record<string, unknown> = {}
+): Record<string, unknown> {
+  const normalizedPayload =
+    typeof payload === "string" ? safeParseJson(payload) || { content: payload } : payload || {};
   const schemaMap = buildNotionSchemaMap(schemaProperties);
-  const properties = {};
+  const properties: Record<string, unknown> = {};
 
   Object.entries(normalizedPayload).forEach(([key, value]) => {
     const propertyInfo = lookupNotionProperty(key, schemaMap, value);
@@ -322,7 +366,7 @@ function buildNotionProperties(payload = {}, schemaProperties = {}) {
     }
   });
 
-  const hasTitle = Object.values(properties).some((property) => property?.title);
+  const hasTitle = Object.values(properties).some((property) => property && typeof property === "object" && (property as any).title);
   if (!hasTitle) {
     properties.Title = createFallbackTitle(normalizedPayload);
   }
@@ -331,10 +375,20 @@ function buildNotionProperties(payload = {}, schemaProperties = {}) {
   return ensureRequiredProperties(properties, schemaProperties, normalizedPayload);
 }
 
-async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionData = {}) {
+interface NotionUpdateContext {
+  parentId: string;
+  schemaProperties: Record<string, unknown>;
+}
+
+async function resolveNotionUpdateArgs(
+  accessToken: string,
+  requestedParentId: string,
+  notionData: Record<string, unknown> = {}
+): Promise<NotionUpdateContext> {
   let parentId = typeof requestedParentId === "string" ? requestedParentId : "";
-  const rawProperties = notionData?.results?.[0]?.properties;
-  const schemaProperties = rawProperties && typeof rawProperties === "object" ? rawProperties : {};
+  const rawProperties = (notionData as any)?.results?.[0]?.properties;
+  const schemaProperties =
+    rawProperties && typeof rawProperties === "object" ? rawProperties : {};
 
   if (!parentId) {
     const databases = await searchDatabases(accessToken);
@@ -344,7 +398,7 @@ async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionDat
         return {
           parentId,
           schemaProperties: Object.fromEntries(
-            databases[0].properties.map((prop) => [prop.name, prop.type || "rich_text"])
+            databases[0].properties.map((prop: any) => [prop.name, prop.type || "rich_text"])
           ),
         };
       }
@@ -354,7 +408,7 @@ async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionDat
   if (parentId && !Object.keys(schemaProperties).length) {
     const rows = await queryDatabase(accessToken, parentId, false);
     if (Array.isArray(rows) && rows.length > 0) {
-      const inferredProperties = {};
+      const inferredProperties: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(rows[0])) {
         if (key.startsWith("__")) continue;
         inferredProperties[key] = value;
@@ -368,18 +422,28 @@ async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionDat
   return { parentId, schemaProperties };
 }
 
-function normalizeSchemaPropertiesArray(schemaProperties = {}) {
+function normalizeSchemaPropertiesArray(
+  schemaProperties: Record<string, unknown> = {}
+): SchemaMapItem[] {
   if (Array.isArray(schemaProperties)) return schemaProperties;
   if (schemaProperties && typeof schemaProperties === "object") {
     return Object.entries(schemaProperties).map(([name, value]) => ({
       name,
-      type: typeof value === "string" ? value : (value && value.type) || inferNotionPropertyType(name, value),
+      type:
+        typeof value === "string"
+          ? value
+          : (value && typeof value === "object" && (value as any).type) ||
+            inferNotionPropertyType(name, value),
     }));
   }
   return [];
 }
 
-async function createNotionPage(accessToken, parentId, properties) {
+async function createNotionPage(
+  accessToken: string,
+  parentId: string,
+  properties: Record<string, unknown>
+): Promise<any> {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
@@ -395,7 +459,7 @@ async function createNotionPage(accessToken, parentId, properties) {
 
   const notionUrl = "https://api.notion.com/v1/pages";
 
-  async function postPage(body) {
+  async function postPage(body: Record<string, unknown>): Promise<any> {
     const response = await fetch(notionUrl, {
       method: "POST",
       headers,
@@ -403,7 +467,9 @@ async function createNotionPage(accessToken, parentId, properties) {
     });
     const responseText = await response.text();
     if (!response.ok) {
-      throw new Error(`Notion API error: ${response.status} ${response.statusText} - ${responseText}`);
+      throw new Error(
+        `Notion API error: ${response.status} ${response.statusText} - ${responseText}`
+      );
     }
     return JSON.parse(responseText);
   }
@@ -411,22 +477,37 @@ async function createNotionPage(accessToken, parentId, properties) {
   try {
     return await postPage({ parent: { database_id: parentId }, properties });
   } catch (databaseError) {
-    const message = databaseError instanceof Error ? databaseError.message : String(databaseError);
-    if (message.includes("database_id") || message.includes("parent") || message.includes("Invalid request")) {
-      throw new Error(`Notion page creation failed. parentId must be a valid database_id. ${message}`);
+    const message =
+      databaseError instanceof Error ? databaseError.message : String(databaseError);
+    if (
+      message.includes("database_id") ||
+      message.includes("parent") ||
+      message.includes("Invalid request")
+    ) {
+      throw new Error(
+        `Notion page creation failed. parentId must be a valid database_id. ${message}`
+      );
     }
 
     throw databaseError;
   }
 }
 
-export async function saveToNotion(accessToken, parentId, payload = {}, schemaProperties = {}) {
+export async function saveToNotion(
+  accessToken: string,
+  parentId: string,
+  payload: Record<string, unknown> = {},
+  schemaProperties: Record<string, unknown> = {}
+): Promise<any> {
   const notionProperties = buildNotionProperties(payload, schemaProperties);
   return createNotionPage(accessToken, parentId, notionProperties);
 }
 
 // Notionデータを取得する関数（遅延実行）
-async function fetchNotionData(accessToken, query = "") {
+async function fetchNotionData(
+  accessToken: string,
+  query = ""
+): Promise<{ results: any[] }> {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
@@ -439,7 +520,7 @@ async function fetchNotionData(accessToken, query = "") {
       maxPages: 2,
     });
 
-    const results = (data?.results || []).map((item) => ({
+    const results = (data?.results || []).map((item: any) => ({
       title: item.title,
       url: item.url,
       lastEdited: item.last_edited_time,
@@ -452,16 +533,14 @@ async function fetchNotionData(accessToken, query = "") {
   } catch (error) {
     console.error(
       "Notionデータ取得エラー:",
-      error instanceof Error
-        ? error.message
-        : String(error)
+      error instanceof Error ? error.message : String(error)
     );
 
     return { results: [] };
   }
 }
 
-export function buildNotionSearchText(rows = [], databaseTitle = "") {
+export function buildNotionSearchText(rows: any[] = [], databaseTitle = ""): string {
   if (!Array.isArray(rows) || rows.length === 0) {
     return "";
   }
@@ -481,7 +560,7 @@ export function buildNotionSearchText(rows = [], databaseTitle = "") {
     .join("\n");
 }
 
-export function matchesNotionQuery(row = {}, question = "") {
+export function matchesNotionQuery(row: Record<string, unknown> = {}, question = ""): boolean {
   const query = normalizeText(question);
   if (!query) return true;
 
@@ -503,7 +582,7 @@ export function matchesNotionQuery(row = {}, question = "") {
   return terms.some((term) => haystack.includes(term));
 }
 
-export async function executeNotionSearch(accessToken, question = "") {
+export async function executeNotionSearch(accessToken: string, question = ""): Promise<string> {
   const searchQuery = normalizeText(question);
   if (!accessToken) {
     return "Notion accessToken が設定されていません。";
@@ -515,10 +594,10 @@ export async function executeNotionSearch(accessToken, question = "") {
       return "Notion でデータベースを見つけられませんでした。";
     }
 
-    const sections = [];
+    const sections: string[] = [];
     for (const database of databases.slice(0, 5)) {
       const rows = await queryDatabase(accessToken, database.id, false);
-      const enrichedRows = [];
+      const enrichedRows: any[] = [];
 
       for (const row of rows) {
         const body = await fetchPageBodyText(accessToken, row.__page_id);
@@ -549,13 +628,15 @@ export async function executeNotionSearch(accessToken, question = "") {
 // Node標準fetchを使う
 //入力: promptText (string) - ユーザからの質問や指示
 //出力: 生成されたテキスト (string) - GROQ APIからの応答
-export async function generateText(promptText) {
+export async function generateText(promptText: string): Promise<string> {
   const normalizedPromptText = normalizeText(promptText);
   if (!normalizedPromptText) {
     throw new Error("generateText requires a non-empty string promptText argument");
   }
 
-  const groqApiKey = (process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY)?.trim();
+  const groqApiKey = (
+    process.env.GROQ_API_KEY || process.env.NEXT_PUBLIC_GROQ_API_KEY
+  )?.trim();
   if (!groqApiKey) {
     throw new Error(
       "GROQ_API_KEY が設定されていません。Vercel の環境変数に GROQ_API_KEY を追加してください。"
@@ -576,7 +657,9 @@ export async function generateText(promptText) {
       }),
     });
   } catch (error) {
-    throw new Error(`GROQ API request failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw new Error(
+      `GROQ API request failed: ${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   if (!res.ok) {
@@ -584,7 +667,7 @@ export async function generateText(promptText) {
     throw new Error(`HTTP ${res.status}: ${responseText}`);
   }
 
-  const data = await res.json().catch(() => null);
+  const data = (await res.json().catch(() => null)) as any;
   return typeof data?.choices?.[0]?.message?.content === "string"
     ? data.choices[0].message.content.trim()
     : "";
@@ -592,7 +675,7 @@ export async function generateText(promptText) {
 
 //notionに対しsearchかupdateのどちらを使用するべきか判断させる。
 //返り値: notion_search か notion_update のいずれかの文字列
-export async function buildToolCallPrompt(userMessage) {
+export async function buildToolCallPrompt(userMessage: string): Promise<"notion_search" | "notion_update" | null> {
   const template = await loadPromptTemplate("tool_call_prompt.txt");
   const usermessage = normalizeText(userMessage);
   const judgePrompt = `${template}\nユーザー入力:${usermessage}\n判断対象: notion_search もしくは notion_update のどちらを使用すべきかを答えてください。返答はnotion_search か notion_update のいずれかの文字列のみで答えてください.`;
@@ -601,7 +684,11 @@ export async function buildToolCallPrompt(userMessage) {
   console.log("判断結果:", rawResult, "=>", normalizeToolName(rawResult));
 }
 
-export async function buildRecallPrompt(userMessage, toolName, toolResult) {
+export async function buildRecallPrompt(
+  userMessage: string,
+  toolName: string,
+  toolResult: string
+): Promise<string> {
   const template = await loadPromptTemplate("re_call_prompt.txt");
   return template
     .replaceAll("{{user_message}}", normalizeText(userMessage))
@@ -609,7 +696,7 @@ export async function buildRecallPrompt(userMessage, toolName, toolResult) {
     .replaceAll("{{tool_result}}", normalizeText(toolResult));
 }
 
-async function buildNotionPrompt(question, accessToken) {
+async function buildNotionPrompt(question: string, accessToken: string): Promise<string> {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
   }
@@ -620,7 +707,7 @@ async function buildNotionPrompt(question, accessToken) {
 
   const notionData = await fetchNotionData(accessToken, questionText);
   const propertiesList = (notionData?.results || [])
-    .flatMap((result) => result.propertiesList || [])
+    .flatMap((result: any) => result.propertiesList || [])
     .flat();
   const propertiesText = propertiesList.join("\n");
 
@@ -636,16 +723,24 @@ async function buildNotionPrompt(question, accessToken) {
 
 export { buildNotionPrompt };
 
-export async function generateTextFromNotionData(question, accessToken) {
+export async function generateTextFromNotionData(question: string, accessToken: string): Promise<string> {
   const promptText = await buildNotionPrompt(question, accessToken);
   return generateText(promptText);
 }
 
+interface GenerateTextWithNotionWorkflowResult {
+  content: string;
+  pendingUpdate: null;
+}
 
-
+//route.tsから呼び出される関数
 //引数: question ユーザーからの質問
 //返り値:　notionデータを見たうえでの回答
-export async function generateTextWithNotionWorkflow(question, accessToken, notionParentId = "") {
+export async function generateTextWithNotionWorkflow(
+  question: string,
+  accessToken: string,
+  notionParentId = ""
+): Promise<GenerateTextWithNotionWorkflowResult> {
   const questionText = normalizeText(question);
   if (!questionText) {
     throw new Error("質問文が必要です");
@@ -662,11 +757,16 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
   }
 
   if (toolName === "notion_update") {
-    const notionUpdateContext = await resolveNotionUpdateArgs(accessToken, notionParentId, notionData);
+    const notionUpdateContext = await resolveNotionUpdateArgs(
+      accessToken,
+      notionParentId,
+      notionData
+    );
 
     if (!notionUpdateContext.parentId) {
       return {
-        content: "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。",
+        content:
+          "Notion page/database ID が設定されていません。設定画面から保存先のIDを登録してください。",
         pendingUpdate: null,
       };
     }
@@ -707,4 +807,3 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
     pendingUpdate: null,
   };
 }
-
