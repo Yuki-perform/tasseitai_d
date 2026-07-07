@@ -152,7 +152,7 @@ export async function getNotionPagesOutput(options = {}) {
 
   return formatted;
 }
-export { buildNotionSavePayload } from "./notion.ts";
+export { buildNotionSavePayload } from "./notion-helper.ts";
 export async function runNotionFetchTest(argv = process.argv, env = process.env) {
   const options = getNotionFetchOptions(argv, env);
   if (!options.accessToken) {
