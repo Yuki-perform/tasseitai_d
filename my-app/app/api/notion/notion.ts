@@ -6,6 +6,10 @@
 // searchNotionPages(apiKey, query) - Notionワークスペース内のページ／データベースを検索します。
 // collectNotionPageInfo(page) - Notionページ／データベースのメタ情報／プロパティ一覧を整形します。
 
+import {Client} from "@notionhq/client";
+
+const notion = new Client({ auth: process.env.NOTION_API_KEY });
+
 const defaultNotionVersion = "2022-06-28";
 
 function buildHeaders(accessToken: string): Record<string, string> {

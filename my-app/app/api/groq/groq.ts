@@ -733,6 +733,7 @@ interface GenerateTextWithNotionWorkflowResult {
   pendingUpdate: null;
 }
 
+
 //route.tsから呼び出される関数
 //引数: question ユーザーからの質問
 //返り値:　notionデータを見たうえでの回答
@@ -771,19 +772,12 @@ export async function generateTextWithNotionWorkflow(
       };
     }
 
-    //1,更新するデータベースのidとtitleを取得
     const dbSchema = await fetchDbSchema(accessToken, notionUpdateContext.parentId);
-    const dbid = dbSchema?.id || notionUpdateContext.parentId;
-    const dbtitle = dbSchema?.title || "";
-
-    //2,更新するデータベースのpropertiesのnameとtypeを取得
     const dbprops = dbSchema?.properties?.length
       ? dbSchema.properties
       : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
 
-    //3,更新内容をデータベースに適した形式に当てはめる
     const savePayload = buildNotionSavePayload(questionText, dbprops);
-
     const savedPage = await saveToNotion(
       accessToken,
       notionUpdateContext.parentId,
