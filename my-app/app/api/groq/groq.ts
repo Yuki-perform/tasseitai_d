@@ -3,6 +3,7 @@
 // その後、generateText関数を呼び出すだけです。
 //
 // 例：test.js での呼び出し例があります。参考にしてください。
+
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -687,6 +688,16 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
     const dbid = dbSchema?.id || notionUpdateContext.parentId;
     const dbtitle = dbSchema?.title || "";
 
+    //2-b,notionに保存
+    try {
+      await notion.pages.create({
+        parent: { database_id: dbid  },
+        properties: notionProperties as Parameters<typeof notion.pages.create>[0]["properties"],
+      })
+    }
+
+
+    /*
     //2,更新するデータベースのpropertiesのnameとtypeを取得
     const dbprops = dbSchema?.properties?.length
       ? dbSchema.properties
@@ -701,6 +712,8 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
       savePayload,
       notionUpdateContext.schemaProperties
     );
+
+    */
 
     return {
       content: savedPage?.url
