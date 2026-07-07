@@ -12,6 +12,25 @@ import {
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
+interface NotionDebugState {
+  requestBody: Record<string, unknown> | null;
+  error: {
+    message: string;
+    status?: number;
+    statusText?: string;
+    responseText?: string;
+  } | null;
+}
+
+let lastNotionDebugState: NotionDebugState = {
+  requestBody: null,
+  error: null,
+};
+
+export function getLastNotionDebugState(): NotionDebugState {
+  return lastNotionDebugState;
+}
+
 async function loadPromptTemplate(fileName: string): Promise<string> {
   const candidatePaths = [
     path.join(currentDir, fileName),
@@ -476,11 +495,32 @@ async function createNotionPage(
 
   try {
     const requestBody = { parent: { database_id: parentId }, properties };
+    lastNotionDebugState = {
+      requestBody,
+      error: null,
+    };
     console.log("[Notion] Sending page creation payload:", requestBody);
     return await postPage(requestBody);
   } catch (databaseError) {
     const message =
       databaseError instanceof Error ? databaseError.message : String(databaseError);
+    const errorDetails = databaseError instanceof Error
+      ? {
+          message,
+          status: (databaseError as Error & { status?: number }).status,
+          statusText: (databaseError as Error & { statusText?: string }).statusText,
+          responseText: (databaseError as Error & { responseText?: string }).responseText,
+        }
+      : { message };
+
+    lastNotionDebugState = {
+      requestBody: {
+        parent: { database_id: parentId },
+        properties,
+      },
+      error: errorDetails,
+    };
+
     if (
       message.includes("database_id") ||
       message.includes("parent") ||
