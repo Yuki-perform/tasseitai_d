@@ -274,7 +274,6 @@ export function getNotionPageProperties(payload: unknown = {}, schemaProperties:
 
 export function buildNotionSavePayload(questionText: string, schemaProperties: unknown = {}) {
   const payload = {
-    title: questionText,
     name: questionText,
     content: questionText,
     description: questionText,
