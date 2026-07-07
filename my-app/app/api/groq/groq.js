@@ -6,7 +6,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { fetchNotionPages, searchDatabases, queryDatabase, fetchPageBodyText } from "../notion/notion.js";
+import {
+  fetchNotionPages,
+  searchDatabases,
+  queryDatabase,
+  fetchPageBodyText,
+  fetchDbSchema,
+} from "../notion/notion.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -360,6 +366,31 @@ async function resolveNotionUpdateArgs(accessToken, requestedParentId, notionDat
   return { parentId, schemaProperties };
 }
 
+function normalizeSchemaPropertiesArray(schemaProperties = {}) {
+  if (Array.isArray(schemaProperties)) return schemaProperties;
+  if (schemaProperties && typeof schemaProperties === "object") {
+    return Object.entries(schemaProperties).map(([name, value]) => ({
+      name,
+      type: typeof value === "string" ? value : (value && value.type) || inferNotionPropertyType(name, value),
+    }));
+  }
+  return [];
+}
+
+function buildNotionSavePayload(questionText, schemaProperties = {}) {
+  const payload = {
+    title: questionText,
+    name: questionText,
+    content: questionText,
+    description: questionText,
+    body: questionText,
+    note: questionText,
+    summary: questionText,
+  };
+
+  return buildNotionProperties(payload, schemaProperties);
+}
+
 async function createNotionPage(accessToken, parentId, properties) {
   if (!accessToken) {
     throw new Error("accessToken が必要です");
@@ -650,10 +681,18 @@ export async function generateTextWithNotionWorkflow(question, accessToken, noti
       };
     }
 
-    const savePayload = {
-      title: questionText,
-      content: questionText,
-    };
+    //1,更新するデータベースのidとtitleを取得
+    const dbSchema = await fetchDbSchema(accessToken, notionUpdateContext.parentId);
+    const dbid = dbSchema?.id || notionUpdateContext.parentId;
+    const dbtitle = dbSchema?.title || "";
+
+    //2,更新するデータベースのpropertiesのnameとtypeを取得
+    const dbprops = dbSchema?.properties?.length
+      ? dbSchema.properties
+      : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
+
+    //3,更新内容をデータベースに適した形式に当てはめる
+    const savePayload = buildNotionSavePayload(questionText, dbprops);
 
     const savedPage = await saveToNotion(
       accessToken,
