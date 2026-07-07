@@ -475,7 +475,9 @@ async function createNotionPage(
   }
 
   try {
-    return await postPage({ parent: { database_id: parentId }, properties });
+    const requestBody = { parent: { database_id: parentId }, properties };
+    console.log("[Notion] Sending page creation payload:", requestBody);
+    return await postPage(requestBody);
   } catch (databaseError) {
     const message =
       databaseError instanceof Error ? databaseError.message : String(databaseError);
