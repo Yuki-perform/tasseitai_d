@@ -215,7 +215,8 @@ function ensureRequiredProperties(properties: Record<string, any>, schemaPropert
 
     switch (type) {
       case "title":
-        properties[name] = createFallbackTitle(payload);
+        //properties配下のキーに登録されている文字列を用いるため、実際に登録されている文字列を取得する。
+        //properties[name] = { title: { text: "testdata"}};
         break;
       case "date":
         properties[name] = { date: { start: new Date().toISOString() } };
