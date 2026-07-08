@@ -824,6 +824,7 @@ export async function generateTextWithNotionWorkflow(
       : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
 
     const savePayload = buildNotionSavePayload(questionText, dbprops);
+    console.log("[Notion] Save payload:", JSON.stringify(savePayload, null, 2));
     const savedPage = await saveToNotion(
       accessToken,
       notionUpdateContext.parentId,
