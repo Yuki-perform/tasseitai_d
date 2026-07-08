@@ -499,17 +499,13 @@ async function createNotionPage(
       requestBody,
       error: null,
     };
-    console.log("[Notion] Sending page creation payload:", requestBody);
-    return await postPage(requestBody);
-  } catch (databaseError) {
-    //--デバッグログv
-    const requestBody = buildCreatePageRequestBody(parentId, properties);
-
-    console.error(
-      "[Notion] Error Payload",
+    //デバッグログ
+    console.log(
+      "[Notion] Sending page creation payload:\n",
       JSON.stringify(requestBody, null, 2)
     );
-    //--デバッグログ^
+    return await postPage(requestBody);
+  } catch (databaseError) {
 
     const message =
       databaseError instanceof Error ? databaseError.message : String(databaseError);
