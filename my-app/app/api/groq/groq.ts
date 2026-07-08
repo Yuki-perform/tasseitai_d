@@ -502,6 +502,15 @@ async function createNotionPage(
     console.log("[Notion] Sending page creation payload:", requestBody);
     return await postPage(requestBody);
   } catch (databaseError) {
+    //--デバッグログv
+    const requestBody = buildCreatePageRequestBody(parentId, properties);
+
+    console.error(
+      "[Notion] Error Payload",
+      JSON.stringify(requestBody, null, 2)
+    );
+    //--デバッグログ^
+
     const message =
       databaseError instanceof Error ? databaseError.message : String(databaseError);
     const errorDetails = databaseError instanceof Error
