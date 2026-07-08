@@ -544,10 +544,9 @@ export async function saveToNotion(
   accessToken: string,
   parentId: string,
   payload: Record<string, unknown> = {},
-  schemaProperties: Record<string, unknown> = {}
 ): Promise<any> {
-  const notionProperties = buildNotionProperties(payload, schemaProperties);
-  return createNotionPage(accessToken, parentId, notionProperties);
+  console.log("[Notion] Save payload:", JSON.stringify(payload, null, 2));
+  return createNotionPage(accessToken, parentId, payload);
 }
 
 // Notionデータを取得する関数（遅延実行）
