@@ -828,7 +828,6 @@ export async function generateTextWithNotionWorkflow(
       accessToken,
       notionUpdateContext.parentId,
       savePayload,
-      notionUpdateContext.schemaProperties
     );
 
     return {
