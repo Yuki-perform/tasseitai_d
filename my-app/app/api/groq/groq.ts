@@ -74,15 +74,6 @@ function normalizeKey(value: unknown): string {
     .toLowerCase();
 }
 
-function safeParseJson(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "string" || !value.trim()) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
 function parseDateValue(value: unknown): string | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString();
@@ -172,44 +163,6 @@ interface SchemaMap {
   groupedByType: Record<string, SchemaMapItem[]>;
 }
 
-function buildNotionSchemaMap(schemaProperties: Record<string, unknown> = {}): SchemaMap {
-  const exactMatches = new Map<string, SchemaMapItem>();
-  const groupedByType: Record<string, SchemaMapItem[]> = {};
-
-  const normalized = normalizeSchemaPropertiesInput(schemaProperties);
-  if (!normalized || typeof normalized !== "object") {
-    return { exactMatches, groupedByType };
-  }
-
-  Object.entries(normalized).forEach(([name, value]) => {
-    const type = typeof value === "string" ? value : inferNotionPropertyType(name, value);
-    const key = normalizeKey(name);
-    exactMatches.set(key, { name, type });
-    groupedByType[type] = groupedByType[type] || [];
-    groupedByType[type].push({ name, type });
-  });
-
-  return { exactMatches, groupedByType };
-}
-
-function lookupNotionProperty(
-  rawKey: string,
-  schemaMap: SchemaMap,
-  rawValue: unknown
-): SchemaMapItem {
-  const normalizedKey = normalizeKey(rawKey);
-  const exact = schemaMap.exactMatches.get(normalizedKey);
-  if (exact) return exact;
-
-  const inferredType = inferNotionPropertyType(rawKey, rawValue);
-  const fallbackByType = schemaMap.groupedByType[inferredType];
-  if (Array.isArray(fallbackByType) && fallbackByType.length > 0) {
-    return fallbackByType[0];
-  }
-
-  return { name: String(rawKey).trim() || "Title", type: inferredType };
-}
-
 function normalizeNotionTextValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value.trim();
@@ -236,57 +189,6 @@ function buildTitleProperty(content: string): Record<string, unknown> {
       },
     ],
   };
-}
-
-function buildNotionPropertyValue(type: string, rawValue: unknown): Record<string, unknown> | null {
-  const valueText = normalizeNotionTextValue(rawValue);
-
-  switch (type) {
-    case "title":
-      return buildTitleProperty(valueText);
-    case "rich_text":
-      return { rich_text: [{ type: "text", text: { content: valueText } }] };
-    case "number": {
-      const numberValue = Number(rawValue);
-      return Number.isFinite(numberValue)
-        ? { number: numberValue }
-        : { number: 0 };
-    }
-    case "checkbox":
-      return { checkbox: Boolean(rawValue) };
-    case "url":
-      return { url: valueText || null };
-    case "email":
-      return { email: valueText || null };
-    case "phone_number":
-      return { phone_number: valueText || null };
-    case "date": {
-      const parsed = parseDateValue(rawValue);
-      // Notion expects a date object for date properties. If parsing fails,
-      // provide a sensible default (current time) to avoid validation errors.
-      return { date: { start: parsed || new Date().toISOString() } };
-    }
-    case "select":
-      return {
-        select: {
-          name: valueText || String(rawValue) || "Uncategorized",
-        },
-      };
-    case "multi_select": {
-      const items = Array.isArray(rawValue)
-        ? rawValue
-        : typeof rawValue === "string"
-          ? rawValue.split(/[,;]+/)
-          : [rawValue];
-      return {
-        multi_select: items
-          .map((item) => ({ name: normalizeNotionTextValue(item) }))
-          .filter((item) => item.name),
-      };
-    }
-    default:
-      return { rich_text: [{ type: "text", text: { content: valueText } }] };
-  }
 }
 
 function ensureRequiredProperties(
@@ -365,33 +267,6 @@ function createFallbackTitle(payload: unknown): Record<string, unknown> {
     : Object.values(payload || {}).map(normalizeNotionTextValue);
   const titleText = values.filter(Boolean).join(" / ").trim();
   return buildTitleProperty(titleText || "Notion update");
-}
-
-function buildNotionProperties(
-  payload: Record<string, unknown> | string | null = {},
-  schemaProperties: Record<string, unknown> = {}
-): Record<string, unknown> {
-  const normalizedPayload =
-    typeof payload === "string" ? safeParseJson(payload) || { content: payload } : payload || {};
-  const schemaMap = buildNotionSchemaMap(schemaProperties);
-  const properties: Record<string, unknown> = {};
-
-  Object.entries(normalizedPayload).forEach(([key, value]) => {
-    const propertyInfo = lookupNotionProperty(key, schemaMap, value);
-    const notionValue = buildNotionPropertyValue(propertyInfo.type, value);
-    if (!notionValue) return;
-    if (!properties[propertyInfo.name]) {
-      properties[propertyInfo.name] = notionValue;
-    }
-  });
-
-  const hasTitle = Object.values(properties).some((property) => property && typeof property === "object" && (property as any).title);
-  if (!hasTitle) {
-    properties.Title = createFallbackTitle(normalizedPayload);
-  }
-
-  // Ensure required properties (dates, titles, numbers, selects, etc.) are present
-  return ensureRequiredProperties(properties, schemaProperties, normalizedPayload);
 }
 
 interface NotionUpdateContext {
