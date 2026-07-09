@@ -273,17 +273,26 @@ export function getNotionPageProperties(payload: unknown = {}, schemaProperties:
   return buildNotionProperties(payload, schemaProperties);
 }
 
-export function buildNotionSavePayload(questionText: string, schemaProperties: unknown = {}) {
-  const payload = {
-    name: questionText,
-    content: questionText,
-    description: questionText,
-    body: questionText,
-    note: questionText,
-    summary: questionText,
-  };
 
-  return buildNotionProperties(payload, schemaProperties);
+
+export function buildNotionSavePayload(
+  mappings: Array<{
+    propertyName: string;
+    value: string;
+  }>,
+  schemaProperties: unknown = {}
+) {
+  const payload = Object.fromEntries(
+    mappings.map(item => [
+      item.propertyName,
+      item.value
+    ])
+  );
+
+  return buildNotionProperties(
+    payload,
+    schemaProperties
+  );
 }
 
 export { collectNotionPageInfo, searchNotionPages } from "./notion";

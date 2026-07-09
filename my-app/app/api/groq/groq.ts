@@ -135,6 +135,7 @@ interface NotionUpdateContext {
   schemaProperties: Record<string, unknown>;
 }
 
+// Notionの更新に必要な引数を解決する関数
 async function resolveNotionUpdateArgs(
   accessToken: string,
   requestedParentId: string,
@@ -364,6 +365,7 @@ export function matchesNotionQuery(row: Record<string, unknown> = {}, question =
   return terms.some((term) => haystack.includes(term));
 }
 
+// Notion検索を実行する関数
 export async function executeNotionSearch(accessToken: string, question = ""): Promise<string> {
   const searchQuery = normalizeText(question);
   if (!accessToken) {
@@ -514,6 +516,63 @@ interface GenerateTextWithNotionWorkflowResult {
   pendingUpdate: null;
 }
 
+//3-4-1登録処理↓↓
+//役割:更新項目の洗い出し,登録対象データベースの判定処理
+interface RegistrationTargetResult {
+  databaseId: string;
+  mappings: Array<{
+    propertyName: string;
+    value: string;
+  }>;
+}
+export async function resolveRegistrationTarget(
+  userMessage: string,
+  workspaceSchema: any[]
+): Promise<RegistrationTargetResult> {
+  const prompt = `
+    あなたはNotionの登録先を判断するAIです。
+
+    ユーザー入力から
+
+    1. 登録対象データベースを選択
+    2. 登録する値を抽出
+    3. データベース項目へマッピング
+
+    を行ってください。
+
+    データベース一覧:
+    ${JSON.stringify(workspaceSchema, null, 2)}
+
+    ユーザー入力:
+    ${userMessage}
+
+    出力形式:
+
+    {
+      "databaseId":"",
+      "mappings":[
+        {
+          "propertyName":"",
+          "value":""
+        }
+      ]
+    }
+
+    JSONのみ返してください。
+    `;
+
+  const responseText = await generateText(prompt);
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    throw new Error(
+    `AI応答をJSON変換できませんでした: ${responseText}`
+    );
+  }
+}
+//3-4-1登録処理↑↑
+
+
 
 //route.tsから呼び出される関数
 //引数: question ユーザーからの質問
@@ -533,6 +592,8 @@ export async function generateTextWithNotionWorkflow(
   console.log("[Notion] Workspace schema:", JSON.stringify(workspaceSchema, null, 2));
 
   const notionData = await fetchNotionData(accessToken, questionText);
+  
+  //検索or登録判定
   const toolName = await buildToolCallPrompt(questionText);
 
   if (!toolName) {
@@ -557,16 +618,20 @@ export async function generateTextWithNotionWorkflow(
       };
     }
 
-    const dbSchema = await fetchDbSchema(accessToken, notionUpdateContext.parentId);
+
+
+    //3-4-1登録処理:ユーザー入力から登録対象データベースを判定
+    const registration = await resolveRegistrationTarget(questionText, workspaceSchema); 
+    const dbSchema = await fetchDbSchema(accessToken, registration.databaseId);
     const dbprops = dbSchema?.properties?.length
       ? dbSchema.properties
       : normalizeSchemaPropertiesArray(notionUpdateContext.schemaProperties);
-
-    const savePayload = buildNotionSavePayload(questionText, dbprops);
+    const savePayload = buildNotionSavePayload(registration.mappings, dbprops);
+    
     console.log("[Notion] Save payload:", JSON.stringify(savePayload, null, 2));
     const savedPage = await saveToNotion(
       accessToken,
-      notionUpdateContext.parentId,
+      registration.databaseId,
       savePayload,
     );
 
@@ -578,7 +643,10 @@ export async function generateTextWithNotionWorkflow(
     };
   }
 
+  //仮--notion_searchを実行する場合の処理
   const toolResult = await executeNotionSearch(accessToken, questionText);
+
+  // Notion検索結果をもとに、最終的な回答を生成する
   const recallPrompt = await buildRecallPrompt(questionText, toolName, toolResult);
 
   return {
