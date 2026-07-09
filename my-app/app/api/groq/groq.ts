@@ -562,6 +562,7 @@ export async function resolveRegistrationTarget(
     `;
 
   const responseText = await generateText(prompt);
+  console.log("[resolveRegistrationTarget] AI response:", responseText);
   try {
     return JSON.parse(responseText);
   } catch {
