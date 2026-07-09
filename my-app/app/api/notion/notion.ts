@@ -332,7 +332,7 @@ export async function findChildDatabases(
   seen?: Set<string>,
   depth = 0
 ): Promise<DbSchema[]> {
-  if (!accessToken || !pageId || depth > 2) {
+  if (!accessToken || !pageId || depth > 5) {
     return [];
   }
 
