@@ -10,6 +10,8 @@ import {
   buildNotionSavePayload,
 } from "../notion/notion";
 
+import { getWorkspaceSchema } from "../notion/notion";
+
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
 interface NotionDebugState {
@@ -525,6 +527,10 @@ export async function generateTextWithNotionWorkflow(
   if (!questionText) {
     throw new Error("質問文が必要です");
   }
+
+  // Notionのワークスペーススキーマを取得
+  const workspaceSchema = await getWorkspaceSchema(accessToken);
+  console.log("[Notion] Workspace schema:", JSON.stringify(workspaceSchema, null, 2));
 
   const notionData = await fetchNotionData(accessToken, questionText);
   const toolName = await buildToolCallPrompt(questionText);

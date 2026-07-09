@@ -682,4 +682,17 @@ export async function fetchNotionPages({
     count: results.length,
     results,
   };
+
+}
+
+export async function getWorkspaceSchema(
+  accessToken: string
+) {
+  const databases = await searchDatabases(accessToken);
+
+  return databases.map((db) => ({
+    databaseId: db.id,
+    databaseTitle: db.title,
+    properties: db.properties,
+  }));
 }
