@@ -3,23 +3,37 @@
 // searchNotionPages(apiKey, query) - Notionワークスペース内のページ／データベースを検索します。
 // collectNotionPageInfo(page) - Notionページ／データベースのメタ情報／プロパティ一覧を整形します。
 
-const defaultNotionVersion = "2022-06-28";
+//interfaceまとめ(機能ごとにimportをまとめる予定)
+import { 
+  RichTextItem,
+  NotionFetchOptions,
+  NotionPagesOutput,
+  NotionPageInfo,
+  DbSchemaProperty,
+  DbSchema,
+  NotionQueryRow,
+  FetchNotionPagesOptions,
+  FetchNotionPagesResult
+} from "../notion";
 
-function buildHeaders(accessToken: string): Record<string, string> {
-  if (!accessToken) {
-    throw new Error("accessToken is required for Notion API authentication");
-  }
-  return {
-    Authorization: `Bearer ${accessToken}`,
-    "Notion-Version": defaultNotionVersion,
-    "Content-Type": "application/json",
-  };
-}
+//Notion API通信共通で使用
+import {
+  fetchNotionJson,
+} from "../notion";
 
-interface RichTextItem {
-  plain_text?: string;
-  [key: string]: any;
-}
+//汎用ユーティリティ関数
+import {
+  safeParseJson,
+  normalizeText,
+  normalizeKey,
+  plainTextFromRichText,
+  normalizeNotionTextValue,
+  formatNotionPropertyValue,
+  parseDateValue,
+  parseInput,
+} from "./utils/notion-utils";
+
+
 
 function buildNotionSchemaMap(schemaProperties: unknown) {
   const exactMatches = new Map<string, { name: string; type: string }>();
@@ -39,11 +53,6 @@ function buildNotionSchemaMap(schemaProperties: unknown) {
   });
 
   return { exactMatches, groupedByType };
-}
-
-function plainTextFromRichText(items: unknown): string {
-  if (!Array.isArray(items)) return "";
-  return (items as RichTextItem[]).map((item) => item?.plain_text || "").join("");
 }
 
 function simplifyPropertyValue(property: any): any {
@@ -112,16 +121,6 @@ function simplifyPropertyValue(property: any): any {
   }
 }
 
-
-function safeParseJson(value: unknown): any {
-  if (typeof value !== "string" || !value.trim()) return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-}
-
 //->groqなし、内部利用あり
 export function extractNotionProperties(properties: Record<string, any> = {}): Record<string, any> {
   if (!properties || typeof properties !== "object") return {};
@@ -131,47 +130,10 @@ export function extractNotionProperties(properties: Record<string, any> = {}): R
   }, {});
 }
 
-function formatNotionPropertyValue(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => {
-        if (item === null || item === undefined) return "";
-        return typeof item === "object" ? JSON.stringify(item) : String(item);
-      })
-      .filter((item) => item !== "")
-      .join(", ");
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value);
-}
-
 //->groqなし、内部利用あり
 export function formatNotionPropertiesList(properties: Record<string, any> = {}): string[] {
   const simplified = extractNotionProperties(properties);
   return Object.entries(simplified).map(([name, value]) => `${name}: ${formatNotionPropertyValue(value)}`);
-}
-
-function parseInput(argv: string[], name: string, envName: string): string | undefined {
-  const prefix = `${name}=`;
-  const arg = argv.find((value) => value.startsWith(prefix));
-  if (arg) {
-    return arg.slice(prefix.length);
-  }
-  return process.env[envName];
-}
-
-interface NotionFetchOptions {
-  accessToken?: string;
-  query: string;
-  searchType: "search" | "workspace";
-  pageSize: number;
-  maxPages: number;
 }
 
 export function getNotionFetchOptions(
@@ -193,12 +155,6 @@ export function getNotionFetchOptions(
   };
 }
 
-interface NotionPagesOutput {
-  source: string;
-  count: number;
-  results: any[];
-}
-
 export async function getNotionPagesOutput(options: Partial<NotionFetchOptions> = {}): Promise<NotionPagesOutput> {
   const {
     accessToken,
@@ -217,22 +173,6 @@ export async function getNotionPagesOutput(options: Partial<NotionFetchOptions> 
   });
 
   return formatted;
-}
-
-function normalizeNotionTextValue(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => normalizeNotionTextValue(item))
-      .filter(Boolean)
-      .join(", ");
-  }
-  if (typeof value === "object") {
-    return JSON.stringify(value);
-  }
-  return String(value).trim();
 }
 
 export function buildNotionSavePayload(
@@ -303,16 +243,6 @@ function normalizeSchemaPropertiesInput(schemaProperties: unknown): Record<strin
   }
   if (typeof schemaProperties === "object") return schemaProperties as Record<string, any>;
   return {};
-}
-
-function parseDateValue(value: unknown): string | null {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString();
-  }
-  const text = normalizeText(value);
-  if (!text) return null;
-  const date = new Date(text);
-  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
 function ensureRequiredProperties(properties: Record<string, any>, schemaProperties: unknown = {}, payload: unknown = {}) {
@@ -387,17 +317,6 @@ function buildTitleProperty(content: string) {
       },
     ],
   };
-}
-
-function normalizeText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function normalizeKey(value: unknown): string {
-  return normalizeText(value)
-    .replace(/[_\s-]+/g, " ")
-    .trim()
-    .toLowerCase();
 }
 
 function inferNotionPropertyType(propertyKey: string, rawValue: unknown): string {
@@ -510,20 +429,7 @@ export function extractNotionTitle(page: any): string {
   return page.url || page.id || "";
 }
 
-interface NotionPageInfo {
-  id: string;
-  object: any;
-  url: string | null;
-  title: string;
-  parent: any;
-  created_time: string | null;
-  last_edited_time: string | null;
-  icon: any;
-  cover: any;
-  properties: Record<string, any>;
-  propertiesList: string[];
-}
-
+//->groqなし、内部利用あり
 export function collectNotionPageInfo(page: any): NotionPageInfo {
   return {
     id: page.id,
@@ -538,37 +444,6 @@ export function collectNotionPageInfo(page: any): NotionPageInfo {
     properties: extractNotionProperties(page.properties),
     propertiesList: formatNotionPropertiesList(page.properties),
   };
-}
-
-async function fetchNotionJson(
-  url: string,
-  accessToken: string,
-  body?: Record<string, any>,
-  method = "POST"
-): Promise<any> {
-  const response = await fetch(url, {
-    method,
-    headers: buildHeaders(accessToken),
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Notion API error: ${response.status} ${response.statusText} - ${errorText}`);
-  }
-
-  return response.json();
-}
-
-interface DbSchemaProperty {
-  name: string;
-  type: string;
-}
-
-interface DbSchema {
-  id: string;
-  title: string;
-  properties: DbSchemaProperty[];
 }
 
 export async function findChildDatabases(
@@ -761,12 +636,6 @@ export async function fetchPageBodyText(accessToken: string, pageId: string): Pr
   }
 }
 
-interface NotionQueryRow {
-  __page_id: string;
-  __body?: string;
-  [key: string]: any;
-}
-
 export async function queryDatabase(
   accessToken: string,
   databaseId: string,
@@ -882,20 +751,7 @@ export async function searchNotionPages(
   return searchNotionWorkspace(accessToken, query, pageSize, maxPages);
 }
 
-interface FetchNotionPagesOptions {
-  accessToken: string;
-  query?: string;
-  searchType?: "workspace" | "search";
-  pageSize?: number;
-  maxPages?: number;
-}
-
-interface FetchNotionPagesResult {
-  source: string;
-  count: number;
-  results: NotionPageInfo[];
-}
-
+//->groqあり、内部利用あり
 export async function fetchNotionPages({
   accessToken,
   query = "",
