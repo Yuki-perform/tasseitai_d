@@ -6,10 +6,6 @@
 // searchNotionPages(apiKey, query) - Notionワークスペース内のページ／データベースを検索します。
 // collectNotionPageInfo(page) - Notionページ／データベースのメタ情報／プロパティ一覧を整形します。
 
-import {Client} from "@notionhq/client";
-
-const notion = new Client({ auth: process.env.NOTION_API_KEY });
-
 const defaultNotionVersion = "2022-06-28";
 
 function buildHeaders(accessToken: string): Record<string, string> {
@@ -130,11 +126,6 @@ function formatNotionPropertyValue(value: unknown): string {
 export function formatNotionPropertiesList(properties: Record<string, any> = {}): string[] {
   const simplified = extractNotionProperties(properties);
   return Object.entries(simplified).map(([name, value]) => `${name}: ${formatNotionPropertyValue(value)}`);
-}
-
-interface ParseInputOptions {
-  argv?: string[];
-  env?: Record<string, string | undefined>;
 }
 
 function parseInput(argv: string[], name: string, envName: string): string | undefined {
@@ -595,17 +586,6 @@ export async function queryDatabase(
     console.warn("[notion] queryDatabase failed", error);
     return [];
   }
-}
-
-export async function queryNotionDatabase(
-  accessToken: string,
-  databaseIdValue: string,
-  pageSize = 50,
-  maxPages = 5,
-  filter: any = null,
-  sorts: any = null
-): Promise<NotionQueryRow[]> {
-  return queryDatabase(accessToken, databaseIdValue);
 }
 
 export async function searchNotionWorkspace(
