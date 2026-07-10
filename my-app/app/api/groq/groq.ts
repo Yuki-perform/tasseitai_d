@@ -29,10 +29,6 @@ let lastNotionDebugState: NotionDebugState = {
   error: null,
 };
 
-export function getLastNotionDebugState(): NotionDebugState {
-  return lastNotionDebugState;
-}
-
 async function loadPromptTemplate(fileName: string): Promise<string> {
   const candidatePaths = [
     path.join(currentDir, fileName),
@@ -477,38 +473,6 @@ export async function buildRecallPrompt(
     .replaceAll("{{user_message}}", normalizeText(userMessage))
     .replaceAll("{{tool_name}}", normalizeText(toolName))
     .replaceAll("{{tool_result}}", normalizeText(toolResult));
-}
-
-async function buildNotionPrompt(question: string, accessToken: string): Promise<string> {
-  if (!accessToken) {
-    throw new Error("accessToken が必要です");
-  }
-  const questionText = normalizeText(question);
-  if (!questionText) {
-    throw new Error("質問文が必要です");
-  }
-
-  const notionData = await fetchNotionData(accessToken, questionText);
-  const propertiesList = (notionData?.results || [])
-    .flatMap((result: any) => result.propertiesList || [])
-    .flat();
-  const propertiesText = propertiesList.join("\n");
-
-  return [
-    "以下は Notion データベースから取得した情報の一覧です。",
-    "これらのデータをもとに、質問に回答してください。",
-    "",
-    propertiesText,
-    "",
-    `質問: ${questionText}`,
-  ].join("\n");
-}
-
-export { buildNotionPrompt };
-
-export async function generateTextFromNotionData(question: string, accessToken: string): Promise<string> {
-  const promptText = await buildNotionPrompt(question, accessToken);
-  return generateText(promptText);
 }
 
 interface GenerateTextWithNotionWorkflowResult {
