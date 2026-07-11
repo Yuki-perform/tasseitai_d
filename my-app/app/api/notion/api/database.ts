@@ -10,7 +10,7 @@ import {
 
 import {
     fetchPageBodyText
-} from "../page/page";
+} from "../page/route";
 
 import {
     plainTextFromRichText
