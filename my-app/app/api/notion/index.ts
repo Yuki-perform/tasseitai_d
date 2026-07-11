@@ -5,4 +5,4 @@ export * from "./api/database";
 export * from "./page/page";
 export * from "./schema/schema";
 export * from "./schema/properties";
-export * from "./workspace";
+export * from "./workspaces";
