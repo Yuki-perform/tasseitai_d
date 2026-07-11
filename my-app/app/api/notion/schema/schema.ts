@@ -1,5 +1,20 @@
 //DBスキーマ処理
 
+import {
+  parseDateValue,
+  normalizeKey
+} from "../utils/notion-utils";
+
+import { DbSchema, DbSchemaProperty } from "../types";
+
+import { 
+  inferNotionPropertyType,
+  createFallbackTitle
+ } from "./properties";
+
+import { fetchNotionJson } from "../api/client";
+
+
 function normalizeSchemaPropertiesInput(schemaProperties: unknown): Record<string, any> {
   if (!schemaProperties) return {};
   if (Array.isArray(schemaProperties)) {
@@ -28,7 +43,7 @@ function normalizeSchemaPropertiesInput(schemaProperties: unknown): Record<strin
   return {};
 }
 
-function buildNotionSchemaMap(schemaProperties: unknown) {
+export function buildNotionSchemaMap(schemaProperties: unknown) {
   const exactMatches = new Map<string, { name: string; type: string }>();
   const groupedByType: Record<string, Array<{ name: string; type: string }>> = {};
 
@@ -48,7 +63,7 @@ function buildNotionSchemaMap(schemaProperties: unknown) {
   return { exactMatches, groupedByType };
 }
 
-function ensureRequiredProperties(properties: Record<string, any>, schemaProperties: unknown = {}, payload: unknown = {}) {
+export function ensureRequiredProperties(properties: Record<string, any>, schemaProperties: unknown = {}, payload: unknown = {}) {
   const normalized = normalizeSchemaPropertiesInput(schemaProperties);
   if (!normalized || typeof normalized !== "object") return properties;
 

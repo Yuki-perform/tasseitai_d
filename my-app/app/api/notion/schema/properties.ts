@@ -9,6 +9,11 @@ import {
   safeParseJson,
 } from "../utils/notion-utils";
 
+import { 
+  buildNotionSchemaMap,
+  ensureRequiredProperties
+} from "./schema";
+
 export function extractNotionProperties(properties: Record<string, any> = {}): Record<string, any> {
   if (!properties || typeof properties !== "object") return {};
   return Object.entries(properties).reduce((acc: Record<string, any>, [name, property]) => {
