@@ -21,6 +21,50 @@
   padding-bottom: 8px;
 }
 
+/* 通知許可を強制するオーバーレイ（許可されるまでホーム画面本体は表示しない） */
+.notificationGateOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.notificationGateCard {
+  background-color: #3b3a4e;
+  border: 1px solid rgba(229, 193, 88, 0.4);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.notificationBannerBtn {
+  background-color: #e5c158;
+  color: #3b3a4e;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+}
+
+.notificationBannerBtn:hover {
+  opacity: 0.9;
+}
+
 .iconBtn {
   background: none;
   border: none;
@@ -42,23 +86,18 @@
   gap: 16px;
 }
 
-/* ⬇️ ここからスマホの表示順を指定（数字が小さい順に上から並びます） */
-.aiChatFullCard   { order: 1; } /* 1. Noir */
-.quickLinkCard    { order: 2; } /* 2. クイックリンク */
-.scheduleTodoGrid { order: 3; } /* 3 & 4. スケジュールとToDoの塊 */
-.weatherCard      { order: 5; } /* 5. 天気 */
+/* スマホ時の表示順（数字が小さい順に上から並びます） */
+.aiChatFullCard   { order: 1; } /* 1. Noir（左カラム） */
+.scheduleCard     { order: 3; } /* 3. Schedule */
+.todoCard         { order: 4; } /* 4. ToDo */
+.weatherCard      { order: 5; } /* 5. Weather（左カラム） */
 .newsCard         { order: 6; } /* 6. News */
-.githubFullCard   { order: 7; } /* 7. GitHub */
+.githubFullCard   { order: 7; } /* 7. GitHub（左カラム） */
 
-/* スケジュールとToDoのエリア（スマホ時は縦並びにする） */
+/* スケジュールとToDoのエリア（スマホ時は不要になるが、PC時の互換性のため残す） */
 .scheduleTodoGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: contents;
 }
-/* スケジュール(3) のあとに ToDo(4) が来るように指定 */
-.scheduleCard     { order: 1; }
-.todoCard         { order: 2; }
 
 /* 左カラム・右カラムのラッパー自体は、PCのグリッド構造のために残しますが、
    スマホ時は邪魔をしないように display: contents; に設定します */
@@ -84,6 +123,13 @@
   font-weight: bold;
 }
 
+.cardTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5c158;
+  opacity: 1;
+}
+
 /* 天気カード */
 .weatherCard {
   composes: card;
@@ -98,6 +144,8 @@
 }
 .githubTitle {
   font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5c158;
   margin-bottom: 4px;
 }
 .githubSub {
@@ -112,63 +160,16 @@
   gap: 6px;
 }
 
-/* クイックリンク全体のカード */
-.quickLinkCard {
-  composes: card;
-  display: flex;
-  align-items: center;
-  gap: 24px; /* 「クイックリンク」の文字とアイテムの間の隙間 */
-  padding: 12px 16px;
-}
-/* 「クイックリンク」の見出し文字 */
-.quickLinkTitle {
-  font-size: 0.95rem;
-  color: #ffffff;
-  white-space: nowrap; /* 画面が狭くなっても改行させない */
-}
-
-/* リンクをまとめるコンテナ */
-.quickLinkItems {
-  display: flex;
-  flex-wrap: wrap; /* スマホなど画面が狭いときは自動で折り返す */
-  gap: 20px;       /* リンク同士の間隔 */
-  align-items: center;
-}
-
-/* 個々のリンクボタン */
-.quickLinkItem {
-  display: flex;
-  align-items: center;
-  gap: 8px; /* アイコンと文字の間の隙間 */
-  color: #ffffff;
-  text-decoration: none;
-  font-size: 0.95rem;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
-}
-
-/* マウスを載せたとき（ホバー時）の演出 */
-.quickLinkItem:hover {
-  background-color: rgba(255, 255, 255, 0.1); /* ほんのり背景を明るく */
-  opacity: 0.9;
-}
-
-/* アイコン（公式ロゴ画像）のサイズと調整 */
-.linkIcon {
-  width: 18px;         /* アイコンの横幅（文字の大きさに合わせる） */
-  height: 18px;        /* アイコンの縦幅 */
-  object-fit: contain; /* 画像が歪まないように収める */
-  display: inline-block;
-  vertical-align: middle;
-}
-
 /* スケジュール */
 .scheduleCard {
   composes: card;
 }
 .scheduleTitle {
   opacity: 1.0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5c158;
+  text-decoration: none;
 }
 .scheduleDate {
   font-size: 1.2rem;
@@ -184,22 +185,37 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.8rem;
-  opacity: 0.7;
+  opacity: 0.9;
   margin-bottom: 8px;
+  font-weight: 500;
+  color: #e5c158;
 }
 .timelineBarWrapper {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.15) 0px,
+    rgba(255, 255, 255, 0.15) 1px,
+    rgba(255, 255, 255, 0.08) 1px,
+    rgba(255, 255, 255, 0.08) calc(100% / 24)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
   padding: 4px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: auto;
 }
 .timelineBar {
   background: #4d4ae8; /* 青いスケジュールバー */
   padding: 4px 8px;
   border-radius: 4px;
   font-size: 0.75rem;
-  width: 60%; /* 横幅の目安 */
-  margin-left: 20%; /* 開始位置の目安 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ToDo */
@@ -209,6 +225,9 @@
 .todoTitle {
   opacity: 1.0;
   margin-bottom: 8px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5c158;
 }
 .todoList {
   display: flex;
@@ -221,6 +240,43 @@
   gap: 8px;
   cursor: pointer;
 }
+.todoLabel input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #e5c158;
+  border-radius: 3px;
+  cursor: pointer;
+  background-color: transparent;
+  transition: all 0.2s ease;
+}
+.todoLabel input[type="checkbox"]:checked {
+  background-color: #e5c158;
+  border-color: #e5c158;
+}
+.todoLabel input[type="checkbox"]:checked::after {
+  content: '✓';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #3b3a4e;
+  font-weight: bold;
+}
+.todoMoreBtn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  opacity: 0.7;
+  font-size: 0.8rem;
+  margin-top: 8px;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.todoMoreBtn:hover {
+  opacity: 1;
+}
 .completed {
   text-decoration: line-through;
   opacity: 0.5;
@@ -229,14 +285,23 @@
 /* ニュース */
 .newsCard {
   composes: card;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
 }
 .newsList {
   list-style: none;
   padding: 0;
-  margin: 8px 0 0 0;
+  margin: 12px 0 0 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 14px;
+  flex-grow: 1;
+  justify-content: space-around;
+}
+.newsItem {
+  font-size: 1rem;
+  line-height: 1.5;
 }
 .newsLink {
   color: #ffffff;
@@ -244,6 +309,13 @@
 }
 .newsLink:hover {
   text-decoration: underline;
+}
+
+/* Schedule/Notion系カードの読み込み中・エラー・空状態の共通テキストスタイル */
+.notionStatus {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-top: 8px;
 }
 
 
@@ -273,27 +345,26 @@
     grid-column: 2; /* グリッドの2列目（右）に配置 */
   }
 
-  /* PC時はスマホ用の並び順(order)をすべて解除して、HTMLの並び順に戻す */
+  /* PC時はスマホ用の並び順(order)をすべて解除 */
   .aiChatFullCard,
-  .quickLinkCard,
-  .scheduleTodoGrid,
+  .scheduleCard,
+  .todoCard,
   .weatherCard,
   .newsCard,
-  .githubFullCard,
-  .scheduleCard,
-  .todoCard {
+  .githubFullCard {
     order: unset;
   }
-  
-  /* PC時はGitHubを下に引き伸ばす */
-  .githubFullCard {
+
+  /* PC時はGitHub・Newsを下に引き伸ばす */
+  .githubFullCard,
+  .newsCard {
     flex-grow: 1;
   }
 
-  /* スケジュールとToDoをPCの時だけ「2 : 1」で横並びにする */
+  /* スケジュールとToDoを縦並びにする */
   .scheduleTodoGrid {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 16px;
   }
 }

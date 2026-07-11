@@ -6,6 +6,30 @@ import { authOptions } from "../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
+type Topic = { id: string; label: string };
+
+function topicChoices(unresolved: string[] = []) {
+  return NOTION_TOPICS.filter((topic: Topic) => !unresolved.includes(topic.id)).map((topic: Topic) => ({
+    id: topic.id,
+    label: topic.label,
+  }));
+}
+
+function handleRegisterAtTopic(topic: Topic, originalMessage: string) {
+  const preview = buildRegistrationPreview(topic.id, originalMessage);
+  return { content: preview.message, pendingItem: preview.item };
+}
+
+async function handleReadForTopics(
+  topics: Topic[],
+  message: string,
+  notionApiKey: string,
+  databaseMap: Record<string, string>
+) {
+  const content = await generateTextFromNotionData(message, topics, notionApiKey, databaseMap);
+  return { content };
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -53,7 +77,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ content: res || content });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "不明なエラーです";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "不明なエラーです";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

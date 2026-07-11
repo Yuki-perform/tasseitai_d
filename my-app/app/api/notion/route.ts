@@ -46,3 +46,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = (await request.json()) as any;
+    const apiKey = await resolveNotionApiKey();
+    const pageId = typeof body.pageId === "string" ? body.pageId.trim() : "";
+    const status = typeof body.status === "string" ? body.status.trim() : "";
+
+    if (!apiKey) {
+      return NextResponse.json({ error: "Notionと連携されていません" }, { status: 401 });
+    }
+
+    if (!pageId) {
+      return NextResponse.json({ error: "pageId が必要です" }, { status: 400 });
+    }
+
+    const response = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Notion-Version": "2022-06-28",
+      },
+      body: JSON.stringify({
+        properties: {
+          ステータス: {
+            status: {
+              name: status,
+            },
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return NextResponse.json({ error }, { status: response.status });
+    }
+
+    const result = await response.json();
+    return NextResponse.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "不明なエラーです";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}

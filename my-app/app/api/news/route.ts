@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   try {
     // 💡 fetchの第2引数に { next: { revalidate: 3600 } } を指定してサーバー側で1時間キャッシュ
     const res = await fetch(
-      `https://gnews.io/api/v4/top-headlines?category=${category}&lang=ja&country=jp&max=2&apikey=${process.env.NEWS_API_KEY}`,
+      `https://gnews.io/api/v4/top-headlines?category=${category}&lang=ja&country=jp&max=5&apikey=${process.env.NEWS_API_KEY}`,
       { next: { revalidate: 3600 } }
     );
 
