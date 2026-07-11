@@ -1,7 +1,7 @@
 //検索機能
 
 import { fetchNotionJson } from "../api/client";
-import { collectNotionPageInfo } from "../page/route";
+import { collectNotionPageInfo } from "./pages";
 import { FetchNotionPagesOptions, FetchNotionPagesResult } from "../types";
 
 export async function searchNotionWorkspace(

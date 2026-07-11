@@ -15,7 +15,7 @@ import {
 
 import {
     fetchNotionJson
-} from "../api/client";
+} from "./client";
 
 export function extractNotionTitle(page: any): string {
   const titleProperty = Object.values(page.properties || {}).find(
