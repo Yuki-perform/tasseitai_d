@@ -8,9 +8,8 @@ import {
   fetchPageBodyText,
   fetchDbSchema,
   buildNotionSavePayload,
-} from "../notion/notion";
-
-import { getWorkspaceSchema } from "../notion/notion";
+  getWorkspaceSchema
+} from "../notion";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 
