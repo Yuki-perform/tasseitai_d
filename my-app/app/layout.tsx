@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_JP } from "next/font/google";
 import "./globals.css";
 
+import { AuthProvider } from "./AuthProvider";
+
 const ibmPlexSansJP = IBM_Plex_Sans_JP({
   variable: "--font-sans",
   weight: ["400", "500", "600", "700"],
@@ -34,7 +36,9 @@ export default function RootLayout({
   return (
     <html lang="ja" className={ibmPlexSansJP.variable}>
       <body className="min-h-full flex flex-col">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
