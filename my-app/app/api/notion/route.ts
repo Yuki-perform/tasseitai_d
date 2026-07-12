@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { collectNotionPageInfo, searchNotionPages } from "../notion";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { resolveNotionApiKey } from "@/lib/notionAuth";
 
 const defaultPageSize = 50;
 const defaultMaxPages = 3;
