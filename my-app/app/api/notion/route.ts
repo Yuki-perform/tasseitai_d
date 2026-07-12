@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { collectNotionPageInfo, searchNotionPages } from "../notion";
+import { collectNotionPageInfo, queryDatabase, searchNotionPages } from "../notion";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { resolveNotionApiKey } from "@/lib/notionAuth";
 
@@ -33,6 +33,39 @@ export async function POST(request: Request) {
     const query = typeof body.query === "string" ? body.query.trim() : "";
     const pageSize = normalizeNumber(body.pageSize, defaultPageSize);
     const maxPages = normalizeNumber(body.maxPages, defaultMaxPages);
+    const databaseId = typeof body.databaseId === "string" ? body.databaseId.trim() : "";
+    const searchType = typeof body.searchType === "string" ? body.searchType : "workspace";
+
+    if (searchType === "database" && databaseId) {
+      const rows = await queryDatabase(accessToken, databaseId, false);
+      const results = rows.map((row: any) => {
+        const properties: Record<string, any> = {};
+
+        for (const [key, value] of Object.entries(row || {})) {
+          if (!key || key.startsWith("__")) continue;
+
+          if (key === "ステータス" || key === "状態") {
+            properties[key] = { name: value ?? "" };
+          } else if (key === "期日" || key === "日時") {
+            properties[key] = { start: value ?? null };
+          } else {
+            properties[key] = value;
+          }
+        }
+
+        return {
+          id: row.__page_id,
+          title: row["タイトル"] || row["予定"] || row["タスク名"] || "",
+          properties,
+        };
+      });
+
+      return NextResponse.json({
+        source: "database",
+        count: results.length,
+        results,
+      });
+    }
 
     const pages = await searchNotionPages(accessToken, query, pageSize, maxPages);
     const results = pages.map((page) => collectNotionPageInfo(page));
