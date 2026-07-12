@@ -4,6 +4,7 @@ import { queryDatabase } from "../../notion";
 import { generateText, executeNotionSearch } from "../../groq/groq";
 import { getAllNotionUserIds, getNotionToken } from "@/lib/notionTokenStore";
 import { getPushSubscriptions, removePushSubscription } from "@/lib/pushSubscriptions";
+import { resolveNotionApiKey } from "@/lib/notionAuth";
 
 export const runtime = "nodejs";
 
@@ -238,7 +239,7 @@ async function composeWrapUpBody(apiKey: string): Promise<string> {
   return generateText(prompt);
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: NextRequest,apiKey: string) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -265,7 +266,6 @@ export async function GET(request: NextRequest) {
   if (!slot) {
     return NextResponse.json({ sent: false, reason: "outside notification hours", jstHour });
   }
-
   const userIds = await getAllNotionUserIds();
 
   async function sendToUser(userId: string, title: string, body: string): Promise<number> {
@@ -291,7 +291,7 @@ export async function GET(request: NextRequest) {
   // weather/newsはNotionを使わないので、全員に同じ内容を送る
   if (slot !== "wrapup" && SHARED_SLOTS.has(slot)) {
     const notificationTitle = CATEGORY_LABELS[slot];
-    const context = await buildCategoryContext(slot, null, null);
+    const context = await buildCategoryContext(slot, apiKey);
     const notificationBody = context ? await composeNotificationBody(context) : null;
 
     if (!notificationBody) {
