@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_JP } from "next/font/google";
 import "./globals.css";
 
-import { AuthProvider } from "./AuthProvider";
+import { AuthProvider } from "./providers";
 
 const ibmPlexSansJP = IBM_Plex_Sans_JP({
   variable: "--font-sans",
