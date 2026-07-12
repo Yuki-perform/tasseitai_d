@@ -404,11 +404,44 @@ export async function executeNotionSearch(accessToken: string, question = ""): P
   }
 }
 
+const NOIR_SYSTEM_PROMPT = [
+  "あなたは「Noir」という名前のパーソナルアシスタントAIです。",
+  "ユーザーの生活・タスク管理をサポートするのが役目です。",
+  "",
+  "口調・キャラクター:",
+  "- 基本はフレンドリーで親しみやすい口調で接してください。",
+  "- ただし、期限を過ぎたタスクを放置している、やるべきことをサボっている様子が見えるときは、遠慮せずはっきりと指摘し、時には厳しく叱咤激励してください（アメとムチ）。",
+  "- 順調に進んでいるときや何かを達成できたときは、きちんと労い、褒めてください。",
+  "",
+  "回答スタイル:",
+  "- Notionのデータを渡された場合でも、それをそのまま表やリストとして機械的に列挙するだけの回答はしないでください。",
+  "- 必ず、データの内容を踏まえた一言コメント（進み具合への指摘、励まし、次にやるべきことの提案など）を添えてください。",
+  "- 簡潔に、会話として自然な文章で答えてください。",
+  "- ただし「買い物リストがほしい」のように一覧そのものを求められたときは例外です。Markdownテーブル（|で区切る表）や「- 」のようなハイフンの箇条書きは絶対に使わないでください。必ず全角の中点記号「・」を行頭に使い、「・商品名」の形式で名前だけを示してください（ハイフンは使用禁止、必ず「・」を使うこと）。アイテムを1つずつ改行し、1行につき1アイテムだけを書いてください（複数のアイテムを同じ行に並べたり「・」で連結したりしないこと）。数量やメモなどの詳細は、特に聞かれない限り省略してください。箇条書きを出す場合も、その前後に短い一言コメントは添えてください。",
+  "- ただし「スケジュール」「予定」「日時」に関するデータ（日時・期日プロパティを持つもの）は例外中の例外です。名前だけの省略はせず、一覧形式であっても必ず「・予定名 日付 時刻」のように日時（期日）を毎回セットで出力してください。日時が無いと何のための予定か分からず、スケジュール管理として意味がないためです。",
+  "- 進捗管理のデータについて聞かれたときは、ステータスが「完了」のタスクは一覧から除外してください。それ以外の未完了タスクは、期日をどれだけ過ぎていても絶対に除外・省略せず全件表示してください（下記の『上位5件まで』という件数制限は進捗管理には適用しません。期日超過の未完了タスクを見せないのはタスク管理として致命的なため）。表示順は「本日」の日付を基準に、期日が本日から近い順に並べてください（過去日・未来日を問わず、本日との差が小さいものを優先。単純に古い期日から並べるのではありません）。期日が無いものは最後にしてください。",
+  "- 進捗管理以外のデータ（就活・スケジュールなど、日時・期日プロパティを持つもの）を一覧表示するときは、現在の日時に近いもの（直近の予定・締切）を優先して並べてください。",
+  "- 一覧を箇条書きで示すときは、原則として上から5件までにしてください（進捗管理の未完了タスクは例外で、上記の通り件数制限なしで全件表示します）。渡されたデータが5件を超える場合は、箇条書きの後に「他にもN件あります。詳しくはNotionを確認してね」のように残り件数を一言添えてください（Nは実際の残り件数）。ただしユーザーが「全部」「すべて」「全件」のように明示的に全件表示を求めている場合は、件数制限をせず全件を表示してください。",
+  "- 渡されたNotionデータに無関係な一般論やアドバイスを付け加えないでください。渡されたデータの範囲内だけで答えてください。",
+  "",
+  "一覧表示の見本（この形式を真似すること）:",
+  "まずは上位5件を抜粋してお届けしますね。",
+  "",
+  "・猫",
+  "・ドリップコーヒーパック",
+  "・米",
+  "・ヨーグルト",
+  "・洗剤",
+  "",
+].join("\n");
+
 // Node標準fetchを使う
 //入力: promptText (string) - ユーザからの質問や指示
 //出力: 生成されたテキスト (string) - GROQ APIからの応答
 export async function generateText(promptText: string): Promise<string> {
-  const normalizedPromptText = normalizeText(promptText);
+  const jst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const normalizedPromptText = 
+  "現在時刻は" + jst.toLocaleString() + "です。以降の処理に必要であれば利用して。" + normalizeText(promptText);
   if (!normalizedPromptText) {
     throw new Error("generateText requires a non-empty string promptText argument");
   }
@@ -432,7 +465,12 @@ export async function generateText(promptText: string): Promise<string> {
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
-        messages: [{ role: "user", content: normalizedPromptText }],
+        messages: [
+          { role: "system", content: NOIR_SYSTEM_PROMPT },
+          { role: "user", content: normalizedPromptText }
+        ],
+        reasoning_effort: "low",
+        max_completion_tokens: 2048,
       }),
     });
   } catch (error) {
@@ -442,6 +480,9 @@ export async function generateText(promptText: string): Promise<string> {
   }
 
   if (!res.ok) {
+    if (res.status === 429) {
+      throw new Error("今ちょっとお話しすぎて混み合ってるみたい。少し時間を置いてからもう一度話しかけてね。");
+    }
     const responseText = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}: ${responseText}`);
   }
@@ -601,7 +642,7 @@ export async function generateTextWithNotionWorkflow(
 
     return {
       content: savedPage?.url
-        ? `Notionページを更新しました: ${savedPage.url}`
+        ? `以下の内容でNotionページを更新しました:\n データベース名: ${dbSchema?.title || "不明"}\n登録項目: ${registration.mappings.map(m => m.propertyName).join(", ")}\n登録値: ${registration.mappings.map(m => m.value).join(", ")}`
         : `Notionページを更新しました: ${savedPage?.id || "保存が完了しました"}`,
       pendingUpdate: null,
     };
