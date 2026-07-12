@@ -34,7 +34,12 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
-    const question = typeof body?.question === "string" ? body.question.trim() : "";
+    const question =
+      typeof body?.question === "string"
+        ? body.question.trim()
+        : typeof body?.message === "string"
+          ? body.message.trim()
+          : "";
 
     let content;
     let res = "";
