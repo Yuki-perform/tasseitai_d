@@ -446,6 +446,8 @@ export default function HomeClient({
               })
               .slice(0, 12);
 
+            console.log('Notionタスクの取得結果:', tasksList);
+
             setTodoTasks(tasksList);
             setTodoLoading(false);
           })
