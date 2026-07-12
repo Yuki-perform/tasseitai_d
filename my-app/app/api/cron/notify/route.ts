@@ -166,12 +166,14 @@ const SHARED_SLOTS = new Set<Category>(["weather", "news"]);
 // データが無い場合も「何も無い」という状態自体をNoirに伝え、必ず何かしら通知を作ってもらう。
 async function buildCategoryContext(
   category: Category,
-  apiKey: string
+  apiKey?: string | null
 ): Promise<string | null> {
+  const safeApiKey = apiKey ?? "";
+
   switch (category) {
     case "shopping": {
-      if (!apiKey) return null;
-      const items = await getShoppingItems(apiKey, DEFAULT_DATABASE_IDS.shopping);
+      if (!safeApiKey) return null;
+      const items = await getShoppingItems(safeApiKey, DEFAULT_DATABASE_IDS.shopping);
       return items.length > 0
         ? `買い物リストの中身: ${items.slice(0, 8).join("、")}`
         : "買い物リストは今のところ空っぽ";
@@ -180,17 +182,10 @@ async function buildCategoryContext(
       return (await getWeatherDescription()) || "天気情報が取得できなかった";
     }
     case "schedule": {
-      return await executeNotionSearch(
-        apiKey,
-        "本日の予定"
-      ); 
+      return await executeNotionSearch(safeApiKey, "本日の予定");
     }
     case "todo": {
-      return await executeNotionSearch(
-        apiKey,
-        "期限が2日以内のタスク"
-      );
-        
+      return await executeNotionSearch(safeApiKey, "期限が2日以内のタスク");
     }
     case "news": {
       const headlines = await getNewsHeadlines();
@@ -199,10 +194,7 @@ async function buildCategoryContext(
         : "ニュースが取得できなかった";
     }
     case "jobhunting": {
-      return await executeNotionSearch(
-        apiKey,
-        "就活案件"
-      );
+      return await executeNotionSearch(safeApiKey, "就活案件");
     }
     default:
       return null;
@@ -221,7 +213,11 @@ async function composeNotificationBody(context: string): Promise<string> {
   return generateText(prompt);
 }
 
-async function composeWrapUpBody(apiKey: string): Promise<string> {
+async function composeWrapUpBody(apiKey?: string | null): Promise<string> {
+  if (!apiKey) {
+    return "Notion accessToken が設定されていません。";
+  }
+
   const tasks = await getAtRiskTasks(apiKey, DEFAULT_DATABASE_IDS.todo);
   const context =
     tasks.length > 0
@@ -239,7 +235,7 @@ async function composeWrapUpBody(apiKey: string): Promise<string> {
   return generateText(prompt);
 }
 
-export async function GET(request: NextRequest,apiKey: string) {
+export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -291,7 +287,7 @@ export async function GET(request: NextRequest,apiKey: string) {
   // weather/newsはNotionを使わないので、全員に同じ内容を送る
   if (slot !== "wrapup" && SHARED_SLOTS.has(slot)) {
     const notificationTitle = CATEGORY_LABELS[slot];
-    const context = await buildCategoryContext(slot, apiKey);
+    const context = await buildCategoryContext(slot, null);
     const notificationBody = context ? await composeNotificationBody(context) : null;
 
     if (!notificationBody) {
