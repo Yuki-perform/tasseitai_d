@@ -6,29 +6,29 @@ import { authOptions } from "../auth/[...nextauth]/route";
 
 export const runtime = "nodejs";
 
-type Topic = { id: string; label: string };
+// type Topic = { id: string; label: string };
 
-function topicChoices(unresolved: string[] = []) {
-  return NOTION_TOPICS.filter((topic: Topic) => !unresolved.includes(topic.id)).map((topic: Topic) => ({
-    id: topic.id,
-    label: topic.label,
-  }));
-}
+// function topicChoices(unresolved: string[] = []) {
+//   return NOTION_TOPICS.filter((topic: Topic) => !unresolved.includes(topic.id)).map((topic: Topic) => ({
+//     id: topic.id,
+//     label: topic.label,
+//   }));
+// }
 
-function handleRegisterAtTopic(topic: Topic, originalMessage: string) {
-  const preview = buildRegistrationPreview(topic.id, originalMessage);
-  return { content: preview.message, pendingItem: preview.item };
-}
+// function handleRegisterAtTopic(topic: Topic, originalMessage: string) {
+//   const preview = buildRegistrationPreview(topic.id, originalMessage);
+//   return { content: preview.message, pendingItem: preview.item };
+// }
 
-async function handleReadForTopics(
-  topics: Topic[],
-  message: string,
-  notionApiKey: string,
-  databaseMap: Record<string, string>
-) {
-  const content = await generateTextFromNotionData(message, topics, notionApiKey, databaseMap);
-  return { content };
-}
+// async function handleReadForTopics(
+//   topics: Topic[],
+//   message: string,
+//   notionApiKey: string,
+//   databaseMap: Record<string, string>
+// ) {
+//   const content = await generateTextFromNotionData(message, topics, notionApiKey, databaseMap);
+//   return { content };
+// }
 
 export async function POST(request: Request) {
   try {

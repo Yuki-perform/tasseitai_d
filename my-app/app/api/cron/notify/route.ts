@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import webpush from "web-push";
-import { queryNotionDatabase, collectNotionPageInfo } from "../../notion/notion.js";
-import { generateText } from "../../groq/groq.js";
+import { queryDatabase, collectNotionPageInfo } from "../../notion";
+import { generateText } from "../../groq/groq";
 import { getAllNotionUserIds, getNotionToken } from "@/lib/notionTokenStore";
 import { getPushSubscriptions, removePushSubscription } from "@/lib/pushSubscriptions";
-import { getUserDatabaseMap, type NotionTopicId } from "@/lib/notionDatabaseMap";
+import { getUserDatabaseMap, type NotionTopicId } from "../../../../lib/notionDatabaseMap";
 
 export const runtime = "nodejs";
 
@@ -60,7 +60,7 @@ function getCurrentSlot(jstHour: number): Category | "wrapup" | null {
 }
 
 async function getShoppingItems(apiKey: string, databaseId: string): Promise<string[]> {
-  const pages = await queryNotionDatabase(apiKey, databaseId, 50, 2);
+  const pages = await queryDatabase(apiKey, databaseId);
   return pages
     .map((page: any) => collectNotionPageInfo(page))
     .map((item: any) => item.properties?.["商品名"] || item.title || "無題")
@@ -78,7 +78,7 @@ async function getWeatherDescription(): Promise<string> {
 }
 
 async function getScheduleToday(apiKey: string, databaseId: string): Promise<{ name: string; time: string }[]> {
-  const pages = await queryNotionDatabase(apiKey, databaseId, 50, 2);
+  const pages = await queryDatabase(apiKey, databaseId);
   const events = pages.map((page: any) => collectNotionPageInfo(page));
 
   const now = new Date();
@@ -101,7 +101,7 @@ async function getScheduleToday(apiKey: string, databaseId: string): Promise<{ n
 
 // 「完了していない」かつ「期限超過」または「2日以内に期日が来る」タスク（＝遅れそう・遅れているタスク）
 async function getAtRiskTasks(apiKey: string, databaseId: string): Promise<string[]> {
-  const pages = await queryNotionDatabase(apiKey, databaseId, 50, 2);
+  const pages = await queryDatabase(apiKey, databaseId);
   const tasks = pages.map((page: any) => collectNotionPageInfo(page));
 
   const now = new Date();
@@ -133,7 +133,7 @@ async function getNewsHeadlines(): Promise<string[]> {
 
 // 就活データベースのうち、期日が7日以内に迫っているもの
 async function getUpcomingJobHunting(apiKey: string, databaseId: string): Promise<string[]> {
-  const pages = await queryNotionDatabase(apiKey, databaseId, 50, 2);
+  const pages = await queryDatabase(apiKey, databaseId);
   const entries = pages.map((page: any) => collectNotionPageInfo(page));
 
   const now = new Date();

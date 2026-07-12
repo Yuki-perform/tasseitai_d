@@ -6,7 +6,7 @@ import {
   getUserDatabaseOverrides,
   setUserDatabaseId,
   type NotionTopicId,
-} from "@/lib/notionDatabaseMap";
+} from "../../../../lib/notionDatabaseMap";
 
 const TOPIC_IDS = Object.keys(DEFAULT_DATABASE_IDS) as NotionTopicId[];
 
